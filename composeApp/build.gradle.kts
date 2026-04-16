@@ -53,6 +53,8 @@ kotlin {
             implementation(libs.coil.compose)
             implementation(libs.coil.network)
 
+            implementation(libs.navigation.compose)
+
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
