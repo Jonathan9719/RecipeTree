@@ -1,6 +1,5 @@
 package org.maxwelltech.recipetree.data.model
 
-import kotlin.time.Instant
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -18,8 +17,8 @@ data class Recipe(
     val cookbookIds: List<String> = emptyList(),
     val averageRating: Float = 0f,
     val ratingCount: Int = 0,
-    val createdAt: Instant? = null,
-    val updatedAt: Instant? = null
+    val createdAt: Long? = null,
+    val updatedAt: Long? = null
 )
 
 @Serializable

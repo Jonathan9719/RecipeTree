@@ -99,7 +99,7 @@ fun SignUpScreen(
                     displayName = it
                     viewModel.clearError()
                 },
-                label = { Text("Your name") },
+                label = { Text("Your display name") },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
                 modifier = Modifier.fillMaxWidth(),
