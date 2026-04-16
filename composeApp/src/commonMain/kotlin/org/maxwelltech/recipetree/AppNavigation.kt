@@ -1,16 +1,26 @@
 package org.maxwelltech.recipetree
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import kotlinx.serialization.Serializable
+import org.maxwelltech.recipetree.ui.screens.LoginScreen
 import org.maxwelltech.recipetree.ui.screens.RecipeListScreen
+import org.maxwelltech.recipetree.ui.screens.SignUpScreen
+import org.maxwelltech.recipetree.viewmodel.AuthViewModel
 
-// Type-safe route definitions
 sealed interface Route {
+
+    @Serializable
+    data object Login : Route
+
+    @Serializable
+    data object SignUp : Route
 
     @Serializable
     data object RecipeList : Route
@@ -30,36 +40,53 @@ sealed interface Route {
 
 @Composable
 fun AppNavigation(
-    navController: NavHostController = rememberNavController()
+    navController: NavHostController = rememberNavController(),
+    authViewModel: AuthViewModel = AuthViewModel(AppContainer.authRepository)
 ) {
+    val currentUser by authViewModel.currentUser.collectAsState()
+
+    // Determine start destination based on auth state
+    val startDestination = if (currentUser != null) Route.RecipeList else Route.Login
+
     NavHost(
         navController = navController,
-        startDestination = Route.RecipeList
+        startDestination = startDestination
     ) {
+        composable<Route.Login> {
+            LoginScreen(navController = navController)
+        }
+
+        composable<Route.SignUp> {
+            SignUpScreen(navController = navController)
+        }
+
         composable<Route.RecipeList> {
-            RecipeListScreen(
-                userId = "temp_user", // will come from auth later
-                navController = navController
-            )
+            val user = currentUser
+            if (user == null) {
+                navController.navigate(Route.Login) {
+                    popUpTo(Route.RecipeList) { inclusive = true }
+                }
+            } else {
+                RecipeListScreen(
+                    userId = user.id,
+                    navController = navController
+                )
+            }
         }
 
         composable<Route.RecipeDetail> { backStackEntry ->
             val route = backStackEntry.toRoute<Route.RecipeDetail>()
-            // RecipeDetailScreen(recipeId = route.recipeId, navController = navController)
         }
 
         composable<Route.RecipeEdit> { backStackEntry ->
             val route = backStackEntry.toRoute<Route.RecipeEdit>()
-            // RecipeEditScreen(recipeId = route.recipeId, navController = navController)
         }
 
         composable<Route.CookbookList> {
-            // CookbookListScreen(navController)
         }
 
         composable<Route.CookbookDetail> { backStackEntry ->
             val route = backStackEntry.toRoute<Route.CookbookDetail>()
-            // CookbookDetailScreen(cookbookId = route.cookbookId, navController = navController)
         }
     }
 }
