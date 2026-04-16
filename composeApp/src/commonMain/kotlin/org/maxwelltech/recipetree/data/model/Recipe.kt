@@ -1,7 +1,9 @@
 package org.maxwelltech.recipetree.data.model
 
 import kotlin.time.Instant
+import kotlinx.serialization.Serializable
 
+@Serializable
 data class Recipe(
     val id: String = "",
     val ownerId: String = "",
@@ -20,6 +22,7 @@ data class Recipe(
     val updatedAt: Instant? = null
 )
 
+@Serializable
 data class Ingredient(
     val name: String = "",
     val amount: String = "",

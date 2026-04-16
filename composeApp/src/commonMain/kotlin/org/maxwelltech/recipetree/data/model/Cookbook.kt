@@ -1,7 +1,9 @@
 package org.maxwelltech.recipetree.data.model
 
 import kotlin.time.Instant
+import kotlinx.serialization.Serializable
 
+@Serializable
 data class Cookbook(
     val id: String = "",
     val name: String = "",
@@ -13,6 +15,7 @@ data class Cookbook(
     val createdAt: Instant? = null
 )
 
+@Serializable
 enum class CookbookVisibility {
     PRIVATE,
     UNLISTED,
