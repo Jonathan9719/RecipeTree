@@ -50,6 +50,9 @@ kotlin {
             implementation(libs.firebase.firestore)
             implementation(libs.firebase.storage)
 
+            implementation(libs.coil.compose)
+            implementation(libs.coil.network)
+
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
