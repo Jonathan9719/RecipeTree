@@ -6,6 +6,6 @@ import org.maxwelltech.recipetree.ui.theme.RecipeTreeTheme
 @Composable
 fun App() {
     RecipeTreeTheme {
-        // Screens will go here
+        AppNavigation()
     }
 }
