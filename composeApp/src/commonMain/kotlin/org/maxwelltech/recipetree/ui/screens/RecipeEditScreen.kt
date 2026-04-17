@@ -293,10 +293,14 @@ fun RecipeEditScreen(
 
             // Settings section
             SectionCard(title = "Settings") {
-                // Tags
+                // Tags — keep raw text locally so separators aren't eaten mid-typing
+                var tagsInput by remember(recipe.id) {
+                    mutableStateOf(recipe.tags.joinToString(", "))
+                }
                 OutlinedTextField(
-                    value = recipe.tags.joinToString(", "),
+                    value = tagsInput,
                     onValueChange = { input ->
+                        tagsInput = input
                         val tags = input.split(",").map { it.trim() }.filter { it.isNotEmpty() }
                         viewModel.updateTags(tags)
                     },
