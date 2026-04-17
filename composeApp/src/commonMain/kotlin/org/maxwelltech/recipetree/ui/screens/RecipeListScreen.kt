@@ -19,6 +19,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -35,7 +36,7 @@ fun RecipeListScreen(
     userId: String,
     navController: NavController,
     authViewModel: AuthViewModel,
-    viewModel: RecipeListViewModel = RecipeListViewModel(AppContainer.recipeRepository)
+    viewModel: RecipeListViewModel = remember { RecipeListViewModel(AppContainer.recipeRepository) }
 ) {
     val recipes by viewModel.recipes.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
