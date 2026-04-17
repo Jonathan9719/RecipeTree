@@ -27,8 +27,12 @@ class RecipeDetailViewModel(
             _isLoading.value = true
             _error.value = null
             try {
-                _recipe.value = recipeRepository.getRecipe(recipeId)
+                println("DEBUG: Loading recipe $recipeId")
+                val result = recipeRepository.getRecipe(recipeId)
+                println("DEBUG: Got recipe ${result.title}")
+                _recipe.value = result
             } catch (e: Exception) {
+                println("DEBUG: Error loading recipe ${e.message}")
                 _error.value = e.message ?: "Failed to load recipe"
             } finally {
                 _isLoading.value = false

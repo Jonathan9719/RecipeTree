@@ -12,6 +12,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import kotlinx.serialization.Serializable
 import org.maxwelltech.recipetree.ui.screens.LoginScreen
+import org.maxwelltech.recipetree.ui.screens.RecipeDetailScreen
 import org.maxwelltech.recipetree.ui.screens.RecipeEditScreen
 import org.maxwelltech.recipetree.ui.screens.RecipeListScreen
 import org.maxwelltech.recipetree.ui.screens.SignUpScreen
@@ -83,6 +84,14 @@ fun AppNavigation(
 
         composable<Route.RecipeDetail> { backStackEntry ->
             val route = backStackEntry.toRoute<Route.RecipeDetail>()
+            val user = currentUser
+            if (user != null) {
+                RecipeDetailScreen(
+                    recipeId = route.recipeId,
+                    userId = user.id,
+                    navController = navController
+                )
+            }
         }
 
         composable<Route.RecipeEdit> { backStackEntry ->
