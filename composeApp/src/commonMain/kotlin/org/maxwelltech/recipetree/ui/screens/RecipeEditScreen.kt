@@ -27,6 +27,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -94,11 +95,22 @@ fun RecipeEditScreen(
                     )
                 },
                 navigationIcon = {
-                    TextButton(onClick = { navController.popBackStack() }) {
-                        Text(
-                            text = "Cancel",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                    Surface(
+                        shape = RoundedCornerShape(20.dp),
+                        color = MaterialTheme.colorScheme.surface,
+                        border = androidx.compose.foundation.BorderStroke(
+                            width = 0.5.dp,
+                            color = MaterialTheme.colorScheme.outline
+                        ),
+                        modifier = Modifier.padding(start = 8.dp)
+                    ) {
+                        TextButton(onClick = { navController.popBackStack() }) {
+                            Text(
+                                text = "Cancel",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
                     }
                 },
                 actions = {
