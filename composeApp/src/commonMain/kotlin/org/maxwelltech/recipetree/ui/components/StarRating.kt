@@ -2,16 +2,13 @@ package org.maxwelltech.recipetree.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.size
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import org.jetbrains.compose.resources.painterResource
-import recipetree.composeapp.generated.resources.Res
-import recipetree.composeapp.generated.resources.ic_star_filled
-import recipetree.composeapp.generated.resources.ic_star_empty
+import androidx.compose.ui.unit.sp
+import org.maxwelltech.recipetree.ui.theme.HoneyDark
 
 @Composable
 fun StarRating(
@@ -24,17 +21,13 @@ fun StarRating(
         horizontalArrangement = Arrangement.spacedBy(1.dp)
     ) {
         repeat(maxStars) { index ->
-            Icon(
-                painter = if (index < rating.toInt())
-                    painterResource(Res.drawable.ic_star_filled)
+            Text(
+                text = if (index < rating.toInt()) "★" else "☆",
+                fontSize = 12.sp,
+                color = if (index < rating.toInt())
+                    HoneyDark
                 else
-                    painterResource(Res.drawable.ic_star_empty),
-                contentDescription = null,
-                tint = if (index < rating.toInt())
-                    MaterialTheme.colorScheme.secondary
-                else
-                    MaterialTheme.colorScheme.outline,
-                modifier = Modifier.size(10.dp)
+                    MaterialTheme.colorScheme.outline
             )
         }
     }
