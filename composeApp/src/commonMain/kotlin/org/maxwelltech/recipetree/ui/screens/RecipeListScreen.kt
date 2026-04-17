@@ -43,7 +43,7 @@ fun RecipeListScreen(
     val error by viewModel.error.collectAsState()
 
     LaunchedEffect(userId) {
-        viewModel.loadUserRecipes(userId)
+        viewModel.observeUserRecipes(userId)
     }
 
     Scaffold(

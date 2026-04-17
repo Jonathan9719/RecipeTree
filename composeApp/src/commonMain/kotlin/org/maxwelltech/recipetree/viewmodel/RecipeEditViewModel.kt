@@ -26,6 +26,9 @@ class RecipeEditViewModel(
     private val _saveSuccess = MutableStateFlow(false)
     val saveSuccess: StateFlow<Boolean> = _saveSuccess.asStateFlow()
 
+    private val _isDeleting = MutableStateFlow(false)
+    val isDeleting: StateFlow<Boolean> = _isDeleting.asStateFlow()
+
     // Load existing recipe for editing
     fun loadRecipe(recipeId: String) {
         viewModelScope.launch {
@@ -65,6 +68,21 @@ class RecipeEditViewModel(
 
     fun updateIsPrivate(isPrivate: Boolean) {
         _recipe.value = _recipe.value.copy(isPrivate = isPrivate)
+    }
+
+    fun deleteRecipe(recipeId: String, onSuccess: () -> Unit) {
+        viewModelScope.launch {
+            _isDeleting.value = true
+            _error.value = null
+            try {
+                recipeRepository.deleteRecipe(recipeId)
+                onSuccess()
+            } catch (e: Exception) {
+                _error.value = e.message ?: "Failed to delete recipe"
+            } finally {
+                _isDeleting.value = false
+            }
+        }
     }
 
     fun saveRecipe(ownerId: String) {

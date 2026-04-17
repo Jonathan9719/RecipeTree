@@ -22,15 +22,17 @@ class RecipeListViewModel(
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
 
-    fun loadUserRecipes(userId: String) {
+    fun observeUserRecipes(userId: String) {
         viewModelScope.launch {
             _isLoading.value = true
             _error.value = null
             try {
-                _recipes.value = recipeRepository.getUserRecipes(userId)
+                recipeRepository.observeUserRecipes(userId).collect { recipes ->
+                    _recipes.value = recipes
+                    _isLoading.value = false
+                }
             } catch (e: Exception) {
                 _error.value = e.message ?: "Failed to load recipes"
-            } finally {
                 _isLoading.value = false
             }
         }
@@ -41,11 +43,12 @@ class RecipeListViewModel(
             _isLoading.value = true
             _error.value = null
             try {
-                recipeRepository.observeCookbookRecipes(cookbookId)
-                    .collect { _recipes.value = it }
+                recipeRepository.observeCookbookRecipes(cookbookId).collect { recipes ->
+                    _recipes.value = recipes
+                    _isLoading.value = false
+                }
             } catch (e: Exception) {
                 _error.value = e.message ?: "Failed to observe recipes"
-            } finally {
                 _isLoading.value = false
             }
         }

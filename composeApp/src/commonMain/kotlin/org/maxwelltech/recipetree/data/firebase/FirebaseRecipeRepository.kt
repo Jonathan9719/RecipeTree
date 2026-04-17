@@ -29,12 +29,11 @@ class FirebaseRecipeRepository(
         recipesCollection.document(id).delete()
     }
 
-    override suspend fun getUserRecipes(userId: String): List<Recipe> {
+    override fun observeUserRecipes(userId: String): Flow<List<Recipe>> {
         return recipesCollection
             .where { "ownerId" equalTo userId }
-            .get()
-            .documents
-            .map { it.data() }
+            .snapshots
+            .map { snapshot -> snapshot.documents.map { it.data() } }
     }
 
     override fun observeCookbookRecipes(cookbookId: String): Flow<List<Recipe>> {
