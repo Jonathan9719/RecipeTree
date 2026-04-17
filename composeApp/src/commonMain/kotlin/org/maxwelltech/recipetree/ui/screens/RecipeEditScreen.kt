@@ -15,10 +15,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
@@ -32,7 +32,6 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -87,7 +86,7 @@ fun RecipeEditScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
+            CenterAlignedTopAppBar(
                 title = {
                     Text(
                         text = if (recipeId == null) "New Recipe" else "Edit Recipe",
@@ -114,25 +113,39 @@ fun RecipeEditScreen(
                     }
                 },
                 actions = {
-                    Button(
-                        onClick = { viewModel.saveRecipe(userId) },
-                        enabled = recipe.title.isNotBlank() && !isSaving,
-                        colors = ButtonDefaults.buttonColors(containerColor = Sage),
-                        shape = RoundedCornerShape(8.dp),
+                    Surface(
+                        shape = RoundedCornerShape(20.dp),
+                        color = Sage,
+                        border = androidx.compose.foundation.BorderStroke(
+                            width = 0.5.dp,
+                            color = MaterialTheme.colorScheme.outline
+                        ),
                         modifier = Modifier.padding(end = 8.dp)
                     ) {
-                        if (isSaving) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(16.dp),
-                                color = MaterialTheme.colorScheme.onPrimary,
-                                strokeWidth = 2.dp
+                        TextButton(
+                            onClick = { viewModel.saveRecipe(userId) },
+                            enabled = recipe.title.isNotBlank() && !isSaving,
+                            colors = ButtonDefaults.textButtonColors(
+                                contentColor = MaterialTheme.colorScheme.onPrimary,
+                                disabledContentColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.6f)
                             )
-                        } else {
-                            Text("Save")
+                        ) {
+                            if (isSaving) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    color = MaterialTheme.colorScheme.onPrimary,
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Text(
+                                    text = "Save",
+                                    style = MaterialTheme.typography.labelLarge
+                                )
+                            }
                         }
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background
                 )
             )
