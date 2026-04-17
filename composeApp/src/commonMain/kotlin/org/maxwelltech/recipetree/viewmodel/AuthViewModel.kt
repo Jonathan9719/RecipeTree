@@ -95,6 +95,10 @@ class AuthViewModel(
         _error.value = null
     }
 
+    fun clearAuthSuccess() {
+        _authSuccess.value = false
+    }
+
     // Converts Firebase error messages into family-friendly language
     private fun friendlyError(message: String?): String {
         return when {

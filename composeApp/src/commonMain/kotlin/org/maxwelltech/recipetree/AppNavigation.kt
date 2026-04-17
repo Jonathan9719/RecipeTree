@@ -1,8 +1,10 @@
 package org.maxwelltech.recipetree
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -41,7 +43,7 @@ sealed interface Route {
 @Composable
 fun AppNavigation(
     navController: NavHostController = rememberNavController(),
-    authViewModel: AuthViewModel = AuthViewModel(AppContainer.authRepository)
+    authViewModel: AuthViewModel = remember { AuthViewModel(AppContainer.authRepository) }
 ) {
     val currentUser by authViewModel.currentUser.collectAsState()
 
@@ -53,23 +55,27 @@ fun AppNavigation(
         startDestination = startDestination
     ) {
         composable<Route.Login> {
-            LoginScreen(navController = navController)
+            LoginScreen(navController = navController, viewModel = authViewModel)
         }
 
         composable<Route.SignUp> {
-            SignUpScreen(navController = navController)
+            SignUpScreen(navController = navController, viewModel = authViewModel)
         }
 
         composable<Route.RecipeList> {
             val user = currentUser
-            if (user == null) {
-                navController.navigate(Route.Login) {
-                    popUpTo(Route.RecipeList) { inclusive = true }
+            LaunchedEffect(user) {
+                if (user == null) {
+                    navController.navigate(Route.Login) {
+                        popUpTo(Route.RecipeList) { inclusive = true }
+                    }
                 }
-            } else {
+            }
+            if (user != null) {
                 RecipeListScreen(
                     userId = user.id,
-                    navController = navController
+                    navController = navController,
+                    authViewModel = authViewModel
                 )
             }
         }

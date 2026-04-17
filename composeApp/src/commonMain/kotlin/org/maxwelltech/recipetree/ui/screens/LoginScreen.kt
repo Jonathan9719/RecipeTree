@@ -38,7 +38,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import org.maxwelltech.recipetree.AppContainer
 import org.maxwelltech.recipetree.Route
 import org.maxwelltech.recipetree.ui.theme.Sage
 import org.maxwelltech.recipetree.ui.theme.SageLight
@@ -47,7 +46,7 @@ import org.maxwelltech.recipetree.viewmodel.AuthViewModel
 @Composable
 fun LoginScreen(
     navController: NavController,
-    viewModel: AuthViewModel = AuthViewModel(AppContainer.authRepository)
+    viewModel: AuthViewModel
 ) {
     val isLoading by viewModel.isLoading.collectAsState()
     val error by viewModel.error.collectAsState()
@@ -60,6 +59,7 @@ fun LoginScreen(
     // Navigate to recipe list on successful auth
     LaunchedEffect(authSuccess) {
         if (authSuccess) {
+            viewModel.clearAuthSuccess()
             navController.navigate(Route.RecipeList) {
                 popUpTo(Route.Login) { inclusive = true }
             }
