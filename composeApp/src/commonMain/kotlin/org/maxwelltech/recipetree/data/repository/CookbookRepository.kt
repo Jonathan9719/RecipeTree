@@ -5,7 +5,7 @@ import org.maxwelltech.recipetree.data.model.Cookbook
 
 interface CookbookRepository {
     suspend fun getCookbook(id: String): Cookbook
-    suspend fun createCookbook(cookbook: Cookbook)
+    suspend fun saveCookbook(cookbook: Cookbook)
     suspend fun deleteCookbook(id: String)
     fun observeUserCookbooks(userId: String): Flow<List<Cookbook>>
     suspend fun addRecipeToCookbook(recipeId: String, cookbookId: String, addedById: String)

@@ -28,7 +28,7 @@ class FirebaseCookbookRepository(
         return cookbooksCollection.document(id).get().data()
     }
 
-    override suspend fun createCookbook(cookbook: Cookbook) {
+    override suspend fun saveCookbook(cookbook: Cookbook) {
         val docRef = if (cookbook.id.isEmpty()) {
             cookbooksCollection.document // auto-generates ID
         } else {
