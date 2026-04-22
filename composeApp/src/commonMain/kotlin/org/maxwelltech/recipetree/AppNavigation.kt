@@ -11,6 +11,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import kotlinx.serialization.Serializable
+import org.maxwelltech.recipetree.ui.screens.AddRecipesToCookbookScreen
 import org.maxwelltech.recipetree.ui.screens.CookbookDetailScreen
 import org.maxwelltech.recipetree.ui.screens.CookbookEditScreen
 import org.maxwelltech.recipetree.ui.screens.CookbookListScreen
@@ -46,6 +47,9 @@ sealed interface Route {
 
     @Serializable
     data class CookbookEdit(val cookbookId: String? = null) : Route
+
+    @Serializable
+    data class AddRecipesToCookbook(val cookbookId: String) : Route
 }
 
 @Composable
@@ -147,6 +151,18 @@ fun AppNavigation(
             val user = currentUser
             if (user != null) {
                 CookbookEditScreen(
+                    cookbookId = route.cookbookId,
+                    userId = user.id,
+                    navController = navController
+                )
+            }
+        }
+
+        composable<Route.AddRecipesToCookbook> { backStackEntry ->
+            val route = backStackEntry.toRoute<Route.AddRecipesToCookbook>()
+            val user = currentUser
+            if (user != null) {
+                AddRecipesToCookbookScreen(
                     cookbookId = route.cookbookId,
                     userId = user.id,
                     navController = navController

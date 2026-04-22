@@ -234,12 +234,31 @@ private fun CookbookDetailContent(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                Text(
-                    text = "RECIPES",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = Sage,
-                    letterSpacing = 0.08.sp
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "RECIPES",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = Sage,
+                        letterSpacing = 0.08.sp
+                    )
+                    TextButton(
+                        onClick = {
+                            navController.navigate(
+                                Route.AddRecipesToCookbook(cookbookId = cookbook.id)
+                            )
+                        }
+                    ) {
+                        Text(
+                            text = "+ Add",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = Sage
+                        )
+                    }
+                }
             }
         }
 

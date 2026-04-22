@@ -5,17 +5,27 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import org.maxwelltech.recipetree.data.model.Cookbook
 import org.maxwelltech.recipetree.data.model.Ingredient
 import org.maxwelltech.recipetree.data.model.Recipe
+import org.maxwelltech.recipetree.data.repository.CookbookRepository
 import org.maxwelltech.recipetree.data.repository.RecipeRepository
 
 class RecipeEditViewModel(
-    private val recipeRepository: RecipeRepository
+    private val recipeRepository: RecipeRepository,
+    private val cookbookRepository: CookbookRepository
 ) : ViewModel() {
 
     private val _recipe = MutableStateFlow(Recipe())
     val recipe: StateFlow<Recipe> = _recipe.asStateFlow()
+
+    private val _availableCookbooks = MutableStateFlow<List<Cookbook>>(emptyList())
+    val availableCookbooks: StateFlow<List<Cookbook>> = _availableCookbooks.asStateFlow()
+
+    private val _selectedCookbookIds = MutableStateFlow<Set<String>>(emptySet())
+    val selectedCookbookIds: StateFlow<Set<String>> = _selectedCookbookIds.asStateFlow()
 
     private val _isSaving = MutableStateFlow(false)
     val isSaving: StateFlow<Boolean> = _isSaving.asStateFlow()
@@ -29,19 +39,36 @@ class RecipeEditViewModel(
     private val _isDeleting = MutableStateFlow(false)
     val isDeleting: StateFlow<Boolean> = _isDeleting.asStateFlow()
 
-    // Load existing recipe for editing
+    // Baseline for diffing cookbook membership on save.
+    private var initialCookbookIds: Set<String> = emptySet()
+
     fun loadRecipe(recipeId: String) {
         viewModelScope.launch {
             _error.value = null
             try {
-                _recipe.value = recipeRepository.getRecipe(recipeId)
+                val loaded = recipeRepository.getRecipe(recipeId)
+                _recipe.value = loaded
+                val seeded = loaded.cookbookIds.toSet()
+                initialCookbookIds = seeded
+                _selectedCookbookIds.value = seeded
             } catch (e: Exception) {
                 _error.value = e.message ?: "Failed to load recipe"
             }
         }
     }
 
-    // Field update functions — each updates only its field
+    fun loadAvailableCookbooks(userId: String) {
+        viewModelScope.launch {
+            try {
+                _availableCookbooks.value = cookbookRepository
+                    .observeUserCookbooks(userId)
+                    .first()
+            } catch (e: Exception) {
+                _error.value = e.message ?: "Failed to load cookbooks"
+            }
+        }
+    }
+
     fun updateTitle(title: String) {
         _recipe.value = _recipe.value.copy(title = title)
     }
@@ -70,6 +97,15 @@ class RecipeEditViewModel(
         _recipe.value = _recipe.value.copy(isPrivate = isPrivate)
     }
 
+    fun toggleCookbook(cookbookId: String) {
+        val current = _selectedCookbookIds.value
+        _selectedCookbookIds.value = if (cookbookId in current) {
+            current - cookbookId
+        } else {
+            current + cookbookId
+        }
+    }
+
     fun deleteRecipe(recipeId: String, onSuccess: () -> Unit) {
         viewModelScope.launch {
             _isDeleting.value = true
@@ -95,7 +131,27 @@ class RecipeEditViewModel(
                 } else {
                     _recipe.value
                 }
-                recipeRepository.saveRecipe(recipeToSave)
+                val saved = recipeRepository.saveRecipe(recipeToSave)
+
+                // Apply cookbook membership diff — recipe doc must exist first since
+                // addRecipeToCookbook does an arrayUnion update on recipes/{id}.
+                val selected = _selectedCookbookIds.value
+                val toAdd = selected - initialCookbookIds
+                val toRemove = initialCookbookIds - selected
+                toAdd.forEach { cookbookId ->
+                    cookbookRepository.addRecipeToCookbook(
+                        recipeId = saved.id,
+                        cookbookId = cookbookId,
+                        addedById = ownerId
+                    )
+                }
+                toRemove.forEach { cookbookId ->
+                    cookbookRepository.removeRecipeFromCookbook(
+                        recipeId = saved.id,
+                        cookbookId = cookbookId
+                    )
+                }
+
                 _saveSuccess.value = true
             } catch (e: Exception) {
                 _error.value = e.message ?: "Failed to save recipe"

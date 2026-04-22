@@ -16,13 +16,15 @@ class FirebaseRecipeRepository(
         return recipesCollection.document(id).get().data()
     }
 
-    override suspend fun saveRecipe(recipe: Recipe) {
+    override suspend fun saveRecipe(recipe: Recipe): Recipe {
         val docRef = if (recipe.id.isEmpty()) {
             recipesCollection.document
         } else {
             recipesCollection.document(recipe.id)
         }
-        docRef.set(recipe.copy(id = docRef.id))
+        val saved = recipe.copy(id = docRef.id)
+        docRef.set(saved)
+        return saved
     }
 
     override suspend fun deleteRecipe(id: String) {

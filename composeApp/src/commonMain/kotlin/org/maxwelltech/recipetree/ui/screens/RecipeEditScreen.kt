@@ -1,8 +1,11 @@
 package org.maxwelltech.recipetree.ui.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -49,6 +52,7 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import org.maxwelltech.recipetree.AppContainer
 import org.maxwelltech.recipetree.Route
+import org.maxwelltech.recipetree.data.model.Cookbook
 import org.maxwelltech.recipetree.data.model.Ingredient
 import org.maxwelltech.recipetree.ui.theme.Sage
 import org.maxwelltech.recipetree.ui.theme.SageLight
@@ -60,9 +64,16 @@ fun RecipeEditScreen(
     recipeId: String? = null,
     userId: String,
     navController: NavController,
-    viewModel: RecipeEditViewModel = remember { RecipeEditViewModel(AppContainer.recipeRepository) }
+    viewModel: RecipeEditViewModel = remember {
+        RecipeEditViewModel(
+            recipeRepository = AppContainer.recipeRepository,
+            cookbookRepository = AppContainer.cookbookRepository
+        )
+    }
 ) {
     val recipe by viewModel.recipe.collectAsState()
+    val availableCookbooks by viewModel.availableCookbooks.collectAsState()
+    val selectedCookbookIds by viewModel.selectedCookbookIds.collectAsState()
     val isSaving by viewModel.isSaving.collectAsState()
     val isDeleting by viewModel.isDeleting.collectAsState()
     val error by viewModel.error.collectAsState()
@@ -75,6 +86,10 @@ fun RecipeEditScreen(
         if (recipeId != null) {
             viewModel.loadRecipe(recipeId)
         }
+    }
+
+    LaunchedEffect(userId) {
+        viewModel.loadAvailableCookbooks(userId)
     }
 
     // Navigate back on successful save
@@ -316,6 +331,23 @@ fun RecipeEditScreen(
                 }
             }
 
+            // Cookbooks section — pick which cookbooks this recipe belongs to
+            SectionCard(title = "Cookbooks") {
+                if (availableCookbooks.isEmpty()) {
+                    Text(
+                        text = "Create a cookbook first to group recipes.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                } else {
+                    CookbookChips(
+                        cookbooks = availableCookbooks,
+                        selectedIds = selectedCookbookIds,
+                        onToggle = { viewModel.toggleCookbook(it) }
+                    )
+                }
+            }
+
             // Settings section
             SectionCard(title = "Settings") {
                 // Tags — keep raw text locally so separators aren't eaten mid-typing
@@ -510,3 +542,35 @@ private fun textFieldColors() = OutlinedTextFieldDefaults.colors(
     focusedLabelColor = Sage,
     cursorColor = Sage
 )
+
+@Composable
+private fun CookbookChips(
+    cookbooks: List<Cookbook>,
+    selectedIds: Set<String>,
+    onToggle: (String) -> Unit
+) {
+    LazyRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        items(cookbooks, key = { it.id }) { cookbook ->
+            val isSelected = cookbook.id in selectedIds
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = if (isSelected) Sage else MaterialTheme.colorScheme.surface,
+                border = androidx.compose.foundation.BorderStroke(
+                    width = 0.5.dp,
+                    color = if (isSelected) Sage else MaterialTheme.colorScheme.outline
+                ),
+                modifier = Modifier.clickable { onToggle(cookbook.id) }
+            ) {
+                Text(
+                    text = cookbook.name,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary
+                            else MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                )
+            }
+        }
+    }
+}
