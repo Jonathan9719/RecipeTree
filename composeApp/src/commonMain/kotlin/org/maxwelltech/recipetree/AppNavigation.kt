@@ -11,6 +11,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import kotlinx.serialization.Serializable
+import org.maxwelltech.recipetree.ui.screens.CookbookListScreen
 import org.maxwelltech.recipetree.ui.screens.LoginScreen
 import org.maxwelltech.recipetree.ui.screens.RecipeDetailScreen
 import org.maxwelltech.recipetree.ui.screens.RecipeEditScreen
@@ -107,6 +108,21 @@ fun AppNavigation(
         }
 
         composable<Route.CookbookList> {
+            val user = currentUser
+            LaunchedEffect(user) {
+                if (user == null) {
+                    navController.navigate(Route.Login) {
+                        popUpTo(Route.CookbookList) { inclusive = true }
+                    }
+                }
+            }
+            if (user != null) {
+                CookbookListScreen(
+                    userId = user.id,
+                    navController = navController,
+                    authViewModel = authViewModel
+                )
+            }
         }
 
         composable<Route.CookbookDetail> { backStackEntry ->
