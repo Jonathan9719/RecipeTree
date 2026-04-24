@@ -15,6 +15,7 @@ import org.maxwelltech.recipetree.ui.screens.AddRecipesToCookbookScreen
 import org.maxwelltech.recipetree.ui.screens.CookbookDetailScreen
 import org.maxwelltech.recipetree.ui.screens.CookbookEditScreen
 import org.maxwelltech.recipetree.ui.screens.CookbookListScreen
+import org.maxwelltech.recipetree.ui.screens.JoinCookbookScreen
 import org.maxwelltech.recipetree.ui.screens.LoginScreen
 import org.maxwelltech.recipetree.ui.screens.RecipeDetailScreen
 import org.maxwelltech.recipetree.ui.screens.RecipeEditScreen
@@ -50,6 +51,9 @@ sealed interface Route {
 
     @Serializable
     data class AddRecipesToCookbook(val cookbookId: String) : Route
+
+    @Serializable
+    data object JoinCookbook : Route
 }
 
 @Composable
@@ -164,6 +168,16 @@ fun AppNavigation(
             if (user != null) {
                 AddRecipesToCookbookScreen(
                     cookbookId = route.cookbookId,
+                    userId = user.id,
+                    navController = navController
+                )
+            }
+        }
+
+        composable<Route.JoinCookbook> {
+            val user = currentUser
+            if (user != null) {
+                JoinCookbookScreen(
                     userId = user.id,
                     navController = navController
                 )
