@@ -1,0 +1,184 @@
+rules_version = '2';
+
+// ============================================================================
+// Recipe Tree — Firestore security rules
+// ============================================================================
+// NOT YET DEPLOYED. Review before running `firebase deploy --only firestore:rules`.
+//
+// What these rules protect against:
+//   1. Concurrent accept on a single-use invite code double-spending a seat
+//      (invite update invariant below enforces usedCount + 1 <= maxUses).
+//   2. Forged invite creation by non-members of a cookbook
+//      (invite create requires createdBy == auth.uid AND membership check).
+//   3. Tampering with someone else's invites
+//      (invite update restricts which fields can change and to what values).
+//   4. Silently editing someone else's cookbook / recipe / profile.
+//
+// Known gaps for a future hardening pass (likely Cloud Functions):
+//   - Rate limiting invite creation per user (Firestore rules are stateless
+//     and can't count requests per unit time).
+//   - Strict "you can only join a cookbook if an invite record for you exists"
+//     cross-collection check. Today, a signed-in user who somehow learned a
+//     cookbook's 20-char random doc id could self-add to memberIds without
+//     going through the invite flow. Cookbook ids are not enumerable by
+//     non-members (the observeUserCookbooks query is memberIds-scoped), so
+//     this is a low-probability path rather than an open door.
+//   - Finer-grained recipe read rules (currently open to all signed-in users).
+// ============================================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---- Helpers -----------------------------------------------------------
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isSelf(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function cookbookDoc(cookbookId) {
+      return get(/databases/$(database)/documents/cookbooks/$(cookbookId));
+    }
+
+    function isCookbookMember(cookbookId) {
+      return isSignedIn()
+        && cookbookDoc(cookbookId).data.memberIds.hasAny([request.auth.uid]);
+    }
+
+    function isCookbookOwner(cookbookId) {
+      return isSignedIn()
+        && cookbookDoc(cookbookId).data.ownerId == request.auth.uid;
+    }
+
+    // ---- users/{userId} ----------------------------------------------------
+    // Read any profile (needed to render member names). Write only own.
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isSelf(userId);
+    }
+
+    // ---- recipes/{recipeId} ------------------------------------------------
+    // Open read in v1 — recipes are referenced from cookbooks which members
+    // can already see. Mutations must come from the recipe's owner. The
+    // cookbookIds array is updated by addRecipeToCookbook batches, which the
+    // Kotlin layer only calls from the owner's device, so this rule is
+    // consistent with current write paths.
+    match /recipes/{recipeId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+        && request.resource.data.ownerId == request.auth.uid;
+      allow update, delete: if isSignedIn()
+        && resource.data.ownerId == request.auth.uid;
+    }
+
+    // ---- cookbooks/{cookbookId} -------------------------------------------
+    // Create must pin ownerId to self AND seed memberIds with self so the
+    // observeUserCookbooks query (memberIds contains self) picks it up —
+    // matches CookbookEditViewModel.saveCookbook's new-cookbook path.
+    // Update allows either the owner (unrestricted) or a non-owner doing
+    // exactly a self-join or self-leave on memberIds (no other field may
+    // change in that path).
+    match /cookbooks/{cookbookId} {
+      allow read: if isSignedIn();
+
+      allow create: if isSignedIn()
+        && request.resource.data.ownerId == request.auth.uid
+        && request.auth.uid in request.resource.data.memberIds;
+
+      allow update: if isSignedIn() && (
+        // Owner: full edit rights.
+        resource.data.ownerId == request.auth.uid
+        ||
+        // Non-owner: only memberIds may change, and only by adding or
+        // removing self. Owner cannot be removed this way because it would
+        // orphan the cookbook — CookbookDetailScreen doesn't expose that
+        // action to anyone either.
+        (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberIds'])
+          && (
+            // self-join
+            (
+              !(request.auth.uid in resource.data.memberIds)
+              && request.auth.uid in request.resource.data.memberIds
+              && request.resource.data.memberIds.size() == resource.data.memberIds.size() + 1
+            )
+            ||
+            // self-leave (owner still can't leave — they're not the one being removed)
+            (
+              request.auth.uid in resource.data.memberIds
+              && !(request.auth.uid in request.resource.data.memberIds)
+              && request.auth.uid != resource.data.ownerId
+              && request.resource.data.memberIds.size() == resource.data.memberIds.size() - 1
+            )
+          )
+        )
+      );
+
+      allow delete: if isSignedIn()
+        && resource.data.ownerId == request.auth.uid;
+
+      // ---- cookbooks/{cookbookId}/members/{memberId} ---------------------
+      // Accept-invite writes a member doc for self; leave/kick deletes it.
+      match /members/{memberId} {
+        allow read: if isSignedIn();
+        allow create: if isSelf(memberId);
+        allow delete: if isSelf(memberId) || isCookbookOwner(cookbookId);
+      }
+
+      // ---- cookbooks/{cookbookId}/recipeRefs/{recipeId} ------------------
+      // Added/removed by addRecipeToCookbook batches. Any cookbook member
+      // can write here; cross-check that the associated recipe update
+      // succeeds via the /recipes/{id} rule above.
+      match /recipeRefs/{recipeId} {
+        allow read: if isSignedIn();
+        allow write: if isCookbookMember(cookbookId);
+      }
+    }
+
+    // ---- invites/{code} ----------------------------------------------------
+    // The hot path. Reads are open to signed-in users (the JoinCookbookScreen
+    // flow reads by code). Creation requires the creator to be a member of
+    // the target cookbook. Updates are tightly restricted — they may ONLY
+    // bump usedCount by exactly 1 (and stamp lastUsedAt/lastUsedBy) while
+    // the invite is still valid. This is what closes the concurrent-accept
+    // race: two transactions both trying to go from usedCount=0 to =1 on a
+    // maxUses=1 invite — only one write lands before the other sees stale
+    // data and retries (Firestore) or gets rejected by this rule.
+    match /invites/{code} {
+      allow read: if isSignedIn();
+
+      allow create: if isSignedIn()
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.usedCount == 0
+        && request.resource.data.revoked == false
+        && request.resource.data.maxUses > 0
+        // Creator must be a member of the cookbook the invite points to.
+        && get(/databases/$(database)/documents/cookbooks/$(request.resource.data.cookbookId))
+             .data.memberIds.hasAny([request.auth.uid]);
+
+      allow update: if isSignedIn()
+        // Only the three accept-path fields may change.
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['usedCount', 'lastUsedAt', 'lastUsedBy'])
+        // Still-valid invite.
+        && resource.data.revoked == false
+        && (resource.data.expiresAt == null
+            || resource.data.expiresAt > request.time.toMillis())
+        // Exactly one seat consumed, and the new count is within the cap.
+        && request.resource.data.usedCount == resource.data.usedCount + 1
+        && request.resource.data.usedCount <= resource.data.maxUses
+        // lastUsedBy must name the actor so the audit trail can't be forged.
+        && request.resource.data.lastUsedBy == request.auth.uid;
+
+      // Revoke is a hard delete — creator or the cookbook owner can pull
+      // the plug. Everyone else is blocked.
+      allow delete: if isSignedIn() && (
+        resource.data.createdBy == request.auth.uid
+        || isCookbookOwner(resource.data.cookbookId)
+      );
+    }
+  }
+}

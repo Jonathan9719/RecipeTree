@@ -18,5 +18,9 @@ data class Invite(
     val usedCount: Int = 0,
     val revoked: Boolean = false,
     /** Role granted on accept. Just "member" in v1. */
-    val role: String = "member"
+    val role: String = "member",
+    /** Set by acceptInvite in the same transaction that increments usedCount. */
+    val lastUsedAt: Long? = null,
+    /** userId of the last accepter. Lets the owner trace a leaked code. */
+    val lastUsedBy: String? = null
 )
