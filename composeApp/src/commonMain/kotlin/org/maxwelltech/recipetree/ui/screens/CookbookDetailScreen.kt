@@ -59,6 +59,7 @@ import org.maxwelltech.recipetree.data.model.Invite
 import org.maxwelltech.recipetree.data.model.Recipe
 import org.maxwelltech.recipetree.data.model.User
 import org.maxwelltech.recipetree.ui.components.RecipeCard
+import org.maxwelltech.recipetree.ui.components.UserAvatar
 import org.maxwelltech.recipetree.ui.theme.Sage
 import org.maxwelltech.recipetree.ui.theme.SageLight
 import org.maxwelltech.recipetree.viewmodel.CookbookDetailViewModel
@@ -654,7 +655,12 @@ private fun MemberRow(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            MemberAvatar(member = member)
+            UserAvatar(
+                displayName = member.displayName,
+                email = member.email,
+                avatarUrl = member.avatarUrl,
+                size = 40.dp
+            )
 
             Spacer(modifier = Modifier.padding(horizontal = 6.dp))
 
@@ -700,37 +706,6 @@ private fun MemberRow(
                     )
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun MemberAvatar(member: User) {
-    val initial = (member.displayName.firstOrNull() ?: member.email.firstOrNull() ?: '?')
-        .uppercaseChar()
-    Box(
-        modifier = Modifier
-            .padding(2.dp)
-            .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.primaryContainer),
-        contentAlignment = Alignment.Center
-    ) {
-        if (!member.avatarUrl.isNullOrBlank()) {
-            AsyncImage(
-                model = member.avatarUrl,
-                contentDescription = "Avatar",
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .height(36.dp)
-                    .padding(0.dp)
-            )
-        } else {
-            Text(
-                text = initial.toString(),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-            )
         }
     }
 }

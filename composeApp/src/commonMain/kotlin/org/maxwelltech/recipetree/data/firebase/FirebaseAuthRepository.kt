@@ -4,8 +4,14 @@ import dev.gitlive.firebase.Firebase
 import dev.gitlive.firebase.auth.FirebaseAuth
 import dev.gitlive.firebase.auth.auth
 import dev.gitlive.firebase.firestore.FirebaseFirestore
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import org.maxwelltech.recipetree.data.model.User
 import org.maxwelltech.recipetree.data.repository.AuthRepository
 
@@ -16,13 +22,29 @@ class FirebaseAuthRepository(
 
     private val usersCollection = firestore.collection("users")
 
-    override val currentUser: Flow<User?> = auth.authStateChanged.map { firebaseUser ->
-        firebaseUser?.let {
-            User(
-                id = it.uid,
-                displayName = it.displayName ?: "",
-                email = it.email ?: ""
-            )
+    // Owns the lifetime of the authStateChanged bridge below. The repo is a
+    // singleton via AppContainer so this scope lives as long as the app does.
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    private val _currentUser = MutableStateFlow<User?>(null)
+    override val currentUser: StateFlow<User?> = _currentUser.asStateFlow()
+
+    init {
+        // Bridge Firebase Auth's authStateChanged into our StateFlow. Anyone
+        // collecting currentUser gets both auth state changes (sign-in /
+        // sign-out, from Firebase) AND profile edits (from updateDisplayName
+        // below, which patches _currentUser directly since authStateChanged
+        // doesn't re-emit for profile changes).
+        scope.launch {
+            auth.authStateChanged.collect { firebaseUser ->
+                _currentUser.value = firebaseUser?.let {
+                    User(
+                        id = it.uid,
+                        displayName = it.displayName ?: "",
+                        email = it.email ?: "",
+                    )
+                }
+            }
         }
     }
 
@@ -62,6 +84,23 @@ class FirebaseAuthRepository(
 
     override suspend fun signOut() {
         auth.signOut()
+    }
+
+    override suspend fun updateDisplayName(newName: String) {
+        val firebaseUser = auth.currentUser
+            ?: throw IllegalStateException("Must be signed in to update profile")
+        // Firestore first — it's the source of truth other members read from in
+        // the member list. If the Auth update fails afterward we're left with a
+        // minor inconsistency (Firestore new, Auth old) that a subsequent retry
+        // self-corrects; the reverse would leave other users seeing a stale name.
+        usersCollection.document(firebaseUser.uid).update(
+            mapOf("displayName" to newName)
+        )
+        firebaseUser.updateProfile(displayName = newName)
+        // Firebase Auth's authStateChanged doesn't fire for profile edits, so
+        // patch our StateFlow directly. Every consumer of currentUser (top-bar
+        // avatar, profile screen, etc.) now reflects the new name immediately.
+        _currentUser.update { it?.copy(displayName = newName) }
     }
 
     override suspend fun sendPasswordResetEmail(email: String) {

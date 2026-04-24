@@ -1,13 +1,15 @@
 package org.maxwelltech.recipetree.data.repository
 
-import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.StateFlow
 import org.maxwelltech.recipetree.data.model.User
 
 interface AuthRepository {
 
     // The currently signed-in user, or null if signed out.
-    // Flow means the UI automatically reacts when auth state changes.
-    val currentUser: Flow<User?>
+    // Exposed as a StateFlow so profile edits (which Firebase Auth's
+    // authStateChanged does NOT re-emit for) can be patched into the same
+    // source of truth — every screen reading this gets the live value.
+    val currentUser: StateFlow<User?>
 
     // Returns the signed-in User on success, throws on failure
     suspend fun signIn(email: String, password: String): User
@@ -16,6 +18,9 @@ interface AuthRepository {
     suspend fun signUp(email: String, password: String, displayName: String): User
 
     suspend fun signOut()
+
+    /** Update display name in both Firebase Auth and the users/{uid} Firestore doc. */
+    suspend fun updateDisplayName(newName: String)
 
     suspend fun sendPasswordResetEmail(email: String)
 
