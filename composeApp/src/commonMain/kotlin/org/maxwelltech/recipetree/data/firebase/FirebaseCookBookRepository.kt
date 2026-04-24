@@ -42,6 +42,13 @@ class FirebaseCookbookRepository(
         cookbooksCollection.document(id).delete()
     }
 
+    override fun observeCookbook(id: String): Flow<Cookbook?> {
+        return cookbooksCollection
+            .document(id)
+            .snapshots
+            .map { snapshot -> if (snapshot.exists) snapshot.data<Cookbook>() else null }
+    }
+
     override fun observeUserCookbooks(userId: String): Flow<List<Cookbook>> {
         return cookbooksCollection
             .where { "memberIds" contains userId }

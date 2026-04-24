@@ -7,6 +7,7 @@ interface CookbookRepository {
     suspend fun getCookbook(id: String): Cookbook
     suspend fun saveCookbook(cookbook: Cookbook)
     suspend fun deleteCookbook(id: String)
+    fun observeCookbook(id: String): Flow<Cookbook?>
     fun observeUserCookbooks(userId: String): Flow<List<Cookbook>>
     suspend fun addRecipeToCookbook(recipeId: String, cookbookId: String, addedById: String)
     suspend fun removeRecipeFromCookbook(recipeId: String, cookbookId: String)
