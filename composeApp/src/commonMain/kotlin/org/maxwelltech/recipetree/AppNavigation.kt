@@ -18,6 +18,7 @@ import org.maxwelltech.recipetree.ui.screens.CookbookListScreen
 import org.maxwelltech.recipetree.ui.screens.JoinCookbookScreen
 import org.maxwelltech.recipetree.ui.screens.LoginScreen
 import org.maxwelltech.recipetree.ui.screens.ProfileScreen
+import org.maxwelltech.recipetree.ui.screens.SettingsScreen
 import org.maxwelltech.recipetree.ui.screens.RecipeDetailScreen
 import org.maxwelltech.recipetree.ui.screens.RecipeEditScreen
 import org.maxwelltech.recipetree.ui.screens.RecipeListScreen
@@ -58,6 +59,9 @@ sealed interface Route {
 
     @Serializable
     data object Profile : Route
+
+    @Serializable
+    data object Settings : Route
 }
 
 @Composable
@@ -194,6 +198,15 @@ fun AppNavigation(
                 ProfileScreen(
                     navController = navController,
                     authViewModel = authViewModel
+                )
+            }
+        }
+
+        composable<Route.Settings> {
+            val user = currentUser
+            if (user != null) {
+                SettingsScreen(
+                    navController = navController
                 )
             }
         }

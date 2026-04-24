@@ -1,6 +1,7 @@
 package org.maxwelltech.recipetree.data.firebase
 
 import dev.gitlive.firebase.Firebase
+import dev.gitlive.firebase.auth.EmailAuthProvider
 import dev.gitlive.firebase.auth.FirebaseAuth
 import dev.gitlive.firebase.auth.auth
 import dev.gitlive.firebase.firestore.FirebaseFirestore
@@ -101,6 +102,20 @@ class FirebaseAuthRepository(
         // patch our StateFlow directly. Every consumer of currentUser (top-bar
         // avatar, profile screen, etc.) now reflects the new name immediately.
         _currentUser.update { it?.copy(displayName = newName) }
+    }
+
+    override suspend fun changePassword(currentPassword: String, newPassword: String) {
+        val firebaseUser = auth.currentUser
+            ?: throw IllegalStateException("Must be signed in to change password")
+        val email = firebaseUser.email
+            ?: throw IllegalStateException("Current account has no email on file")
+        // Firebase requires recent auth to change a password, so re-auth with the
+        // current credentials first. If the current password is wrong this step
+        // throws and we never call updatePassword — the user's actual password
+        // stays untouched.
+        val credential = EmailAuthProvider.credential(email = email, password = currentPassword)
+        firebaseUser.reauthenticate(credential)
+        firebaseUser.updatePassword(newPassword)
     }
 
     override suspend fun sendPasswordResetEmail(email: String) {

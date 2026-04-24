@@ -22,6 +22,16 @@ interface AuthRepository {
     /** Update display name in both Firebase Auth and the users/{uid} Firestore doc. */
     suspend fun updateDisplayName(newName: String)
 
+    /**
+     * Change the current user's password. Re-authenticates with [currentPassword]
+     * first because Firebase requires recent auth for password updates, then
+     * calls updatePassword([newPassword]).
+     *
+     * Throws if the user is signed out, the current password is wrong, or the
+     * new password fails Firebase's minimum length rule (6 chars).
+     */
+    suspend fun changePassword(currentPassword: String, newPassword: String)
+
     suspend fun sendPasswordResetEmail(email: String)
 
     // Hook for future SSO — implementations will handle Google, Apple etc.

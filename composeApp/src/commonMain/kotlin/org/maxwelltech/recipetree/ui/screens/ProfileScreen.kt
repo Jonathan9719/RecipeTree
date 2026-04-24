@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import org.maxwelltech.recipetree.AppContainer
 import org.maxwelltech.recipetree.Route
+import org.maxwelltech.recipetree.ui.components.SettingRow
 import org.maxwelltech.recipetree.ui.components.UserAvatar
 import org.maxwelltech.recipetree.ui.theme.Sage
 import org.maxwelltech.recipetree.viewmodel.AuthViewModel
@@ -139,12 +140,15 @@ fun ProfileScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            ProfileActionRow(
+            SettingRow(
                 label = "Edit display name",
                 onClick = { showNameDialog = true }
             )
 
-            // Settings row added in 3b when SettingsScreen lands.
+            SettingRow(
+                label = "Settings",
+                onClick = { navController.navigate(Route.Settings) }
+            )
 
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -179,46 +183,6 @@ fun ProfileScreen(
                 showNameDialog = false
             }
         )
-    }
-}
-
-@Composable
-private fun ProfileActionRow(
-    label: String,
-    onClick: () -> Unit
-) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(
-            width = 0.5.dp,
-            color = MaterialTheme.colorScheme.outline
-        )
-    ) {
-        TextButton(
-            onClick = onClick,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.weight(1f)
-                )
-                Text(
-                    text = "›",
-                    fontSize = 20.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
     }
 }
 
