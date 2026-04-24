@@ -7,17 +7,33 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.maxwelltech.recipetree.data.model.Cookbook
+import org.maxwelltech.recipetree.data.model.Invite
 import org.maxwelltech.recipetree.data.model.Recipe
 import org.maxwelltech.recipetree.data.model.User
 import org.maxwelltech.recipetree.data.repository.CookbookRepository
+import org.maxwelltech.recipetree.data.repository.InviteRepository
 import org.maxwelltech.recipetree.data.repository.RecipeRepository
 import org.maxwelltech.recipetree.data.repository.UserProfileRepository
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.ExperimentalTime
 
+@OptIn(ExperimentalTime::class)
 class CookbookDetailViewModel(
     private val cookbookRepository: CookbookRepository,
     private val recipeRepository: RecipeRepository,
-    private val userProfileRepository: UserProfileRepository
+    private val userProfileRepository: UserProfileRepository,
+    private val inviteRepository: InviteRepository
 ) : ViewModel() {
+
+    /** Presets offered in the "+ New invite" UI. See [createInvite]. */
+    enum class InvitePreset {
+        /** Targeted invite — 1 use, 24h TTL. */
+        SINGLE_USE_24H,
+        /** Small-group invite — up to 10 uses, 7d TTL. */
+        MULTI_USE_7D
+    }
 
     private val _cookbook = MutableStateFlow<Cookbook?>(null)
     val cookbook: StateFlow<Cookbook?> = _cookbook.asStateFlow()
@@ -27,6 +43,13 @@ class CookbookDetailViewModel(
 
     private val _members = MutableStateFlow<List<User>>(emptyList())
     val members: StateFlow<List<User>> = _members.asStateFlow()
+
+    private val _invites = MutableStateFlow<List<Invite>>(emptyList())
+    val invites: StateFlow<List<Invite>> = _invites.asStateFlow()
+
+    /** Set on successful createInvite so the UI can show the code in a dialog. Cleared with [clearNewlyCreatedInvite]. */
+    private val _newlyCreatedInvite = MutableStateFlow<Invite?>(null)
+    val newlyCreatedInvite: StateFlow<Invite?> = _newlyCreatedInvite.asStateFlow()
 
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
@@ -39,6 +62,12 @@ class CookbookDetailViewModel(
 
     private val _memberActionError = MutableStateFlow<String?>(null)
     val memberActionError: StateFlow<String?> = _memberActionError.asStateFlow()
+
+    private val _isProcessingInvite = MutableStateFlow(false)
+    val isProcessingInvite: StateFlow<Boolean> = _isProcessingInvite.asStateFlow()
+
+    private val _inviteActionError = MutableStateFlow<String?>(null)
+    val inviteActionError: StateFlow<String?> = _inviteActionError.asStateFlow()
 
     // Track the last member set we resolved profiles for so we don't re-fetch on
     // every cookbook emission (e.g. when only the name changes).
@@ -74,6 +103,18 @@ class CookbookDetailViewModel(
                 }
             } catch (e: Exception) {
                 _error.value = e.message ?: "Failed to load recipes"
+            }
+        }
+    }
+
+    fun observeInvites(cookbookId: String) {
+        viewModelScope.launch {
+            try {
+                inviteRepository.observeCookbookInvites(cookbookId).collect { invites ->
+                    _invites.value = invites.sortedByDescending { it.createdAt ?: 0L }
+                }
+            } catch (e: Exception) {
+                _inviteActionError.value = e.message ?: "Failed to load invites"
             }
         }
     }
@@ -126,5 +167,49 @@ class CookbookDetailViewModel(
                 _isProcessingMember.value = false
             }
         }
+    }
+
+    fun createInvite(cookbookId: String, createdBy: String, preset: InvitePreset) {
+        viewModelScope.launch {
+            _isProcessingInvite.value = true
+            _inviteActionError.value = null
+            try {
+                val now = Clock.System.now().toEpochMilliseconds()
+                val (maxUses, ttl) = when (preset) {
+                    InvitePreset.SINGLE_USE_24H -> 1 to 24.hours
+                    InvitePreset.MULTI_USE_7D -> 10 to 7.days
+                }
+                val invite = inviteRepository.createInvite(
+                    cookbookId = cookbookId,
+                    createdBy = createdBy,
+                    maxUses = maxUses,
+                    expiresAt = now + ttl.inWholeMilliseconds
+                )
+                _newlyCreatedInvite.value = invite
+            } catch (e: Exception) {
+                _inviteActionError.value = e.message ?: "Failed to create invite"
+            } finally {
+                _isProcessingInvite.value = false
+            }
+        }
+    }
+
+    fun revokeInvite(code: String) {
+        viewModelScope.launch {
+            _isProcessingInvite.value = true
+            _inviteActionError.value = null
+            try {
+                inviteRepository.revokeInvite(code)
+                // observeInvites flow will re-emit without the revoked doc.
+            } catch (e: Exception) {
+                _inviteActionError.value = e.message ?: "Failed to revoke invite"
+            } finally {
+                _isProcessingInvite.value = false
+            }
+        }
+    }
+
+    fun clearNewlyCreatedInvite() {
+        _newlyCreatedInvite.value = null
     }
 }
