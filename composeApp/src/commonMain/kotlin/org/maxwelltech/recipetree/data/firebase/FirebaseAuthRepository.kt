@@ -90,13 +90,24 @@ class FirebaseAuthRepository(
     override suspend fun updateDisplayName(newName: String) {
         val firebaseUser = auth.currentUser
             ?: throw IllegalStateException("Must be signed in to update profile")
-        // Firestore first — it's the source of truth other members read from in
-        // the member list. If the Auth update fails afterward we're left with a
-        // minor inconsistency (Firestore new, Auth old) that a subsequent retry
-        // self-corrects; the reverse would leave other users seeing a stale name.
-        usersCollection.document(firebaseUser.uid).update(
-            mapOf("displayName" to newName)
-        )
+        val userDocRef = usersCollection.document(firebaseUser.uid)
+        // Firestore first — source of truth for the member list. Branch on doc
+        // existence because Firestore's update() throws NOT_FOUND on missing
+        // docs (it's not a permission issue, just a strict contract). Accounts
+        // that signed up before signUp started writing users/{uid} need a
+        // backfill on first edit; everyone else just gets the displayName patch.
+        val snapshot = userDocRef.get()
+        if (snapshot.exists) {
+            userDocRef.update(mapOf("displayName" to newName))
+        } else {
+            userDocRef.set(
+                User(
+                    id = firebaseUser.uid,
+                    displayName = newName,
+                    email = firebaseUser.email ?: ""
+                )
+            )
+        }
         firebaseUser.updateProfile(displayName = newName)
         // Firebase Auth's authStateChanged doesn't fire for profile edits, so
         // patch our StateFlow directly. Every consumer of currentUser (top-bar
