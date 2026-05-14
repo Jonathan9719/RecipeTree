@@ -25,6 +25,9 @@ interface InviteRepository {
     /** Live list of active invites for a cookbook (for the owner's management UI). */
     fun observeCookbookInvites(cookbookId: String): Flow<List<Invite>>
 
+    /** Live list of invites this user created — used by account deletion to revoke them. */
+    fun observeUserCreatedInvites(userId: String): Flow<List<Invite>>
+
     /**
      * Validate and consume an invite in a single transaction, then add [userId] to the
      * cookbook's memberIds + members subcollection. Returns the cookbookId on success.

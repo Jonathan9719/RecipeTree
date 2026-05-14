@@ -5,12 +5,21 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.maxwelltech.recipetree.data.repository.AuthRepository
+import org.maxwelltech.recipetree.data.repository.CookbookRepository
+import org.maxwelltech.recipetree.data.repository.InviteRepository
+import org.maxwelltech.recipetree.data.repository.RecipeRepository
 
 class SettingsViewModel(
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    private val cookbookRepository: CookbookRepository,
+    private val recipeRepository: RecipeRepository,
+    private val inviteRepository: InviteRepository
 ) : ViewModel() {
+
+    // ---- Change password -------------------------------------------------
 
     private val _isChangingPassword = MutableStateFlow(false)
     val isChangingPassword: StateFlow<Boolean> = _isChangingPassword.asStateFlow()
@@ -22,6 +31,26 @@ class SettingsViewModel(
     /** Emitted once on a successful password change so the screen can close the dialog + show a confirmation. */
     private val _passwordChangeSuccess = MutableStateFlow(false)
     val passwordChangeSuccess: StateFlow<Boolean> = _passwordChangeSuccess.asStateFlow()
+
+    // ---- Delete account --------------------------------------------------
+
+    private val _ownedCookbookCount = MutableStateFlow(0)
+    val ownedCookbookCount: StateFlow<Int> = _ownedCookbookCount.asStateFlow()
+
+    private val _ownedRecipeCount = MutableStateFlow(0)
+    val ownedRecipeCount: StateFlow<Int> = _ownedRecipeCount.asStateFlow()
+
+    private val _isDeletingAccount = MutableStateFlow(false)
+    val isDeletingAccount: StateFlow<Boolean> = _isDeletingAccount.asStateFlow()
+
+    private val _deleteAccountError = MutableStateFlow<String?>(null)
+    val deleteAccountError: StateFlow<String?> = _deleteAccountError.asStateFlow()
+
+    /** Flips to true after Firebase Auth user is gone; the screen routes to Login. */
+    private val _deleteAccountSuccess = MutableStateFlow(false)
+    val deleteAccountSuccess: StateFlow<Boolean> = _deleteAccountSuccess.asStateFlow()
+
+    // ---- Change password actions -----------------------------------------
 
     fun changePassword(currentPassword: String, newPassword: String) {
         if (currentPassword.isBlank()) {
@@ -59,6 +88,83 @@ class SettingsViewModel(
 
     fun clearPasswordChangeSuccess() {
         _passwordChangeSuccess.value = false
+    }
+
+    // ---- Delete account actions ------------------------------------------
+
+    /**
+     * Refresh the counts shown in the delete-account warning. Called when
+     * Settings opens so the dialog has live numbers when the user taps the
+     * delete row. Cheap — one .first() snapshot per flow.
+     */
+    fun loadAccountSummary(userId: String) {
+        viewModelScope.launch {
+            try {
+                val cookbooks = cookbookRepository.observeUserCookbooks(userId).first()
+                _ownedCookbookCount.value = cookbooks.count { it.ownerId == userId }
+                val recipes = recipeRepository.observeUserRecipes(userId).first()
+                _ownedRecipeCount.value = recipes.size
+            } catch (_: Exception) {
+                // Counts are advisory; if we can't fetch them the dialog
+                // shows zeros and the cascade still runs correctly.
+                _ownedCookbookCount.value = 0
+                _ownedRecipeCount.value = 0
+            }
+        }
+    }
+
+    /**
+     * Cascade-delete everything tied to [userId] then the Firebase Auth user.
+     * Order matters: Auth user goes LAST so a network failure midway leaves
+     * the user still signed in and able to retry.
+     */
+    fun deleteAccount(userId: String, currentPassword: String) {
+        if (currentPassword.isBlank()) {
+            _deleteAccountError.value = "Enter your current password to confirm."
+            return
+        }
+        viewModelScope.launch {
+            _isDeletingAccount.value = true
+            _deleteAccountError.value = null
+            try {
+                // 1. Prove identity — Firebase requires this for the Auth
+                //    delete() call below. Doing it up front means a wrong
+                //    password fails fast without touching any data.
+                authRepository.reauthenticate(currentPassword)
+
+                // 2. Owned cookbooks first (other members lose access here).
+                val cookbooks = cookbookRepository.observeUserCookbooks(userId).first()
+                val owned = cookbooks.filter { it.ownerId == userId }
+                val memberOnly = cookbooks.filter { it.ownerId != userId }
+                owned.forEach { cookbookRepository.deleteCookbook(it.id) }
+
+                // 3. Owned recipes.
+                val recipes = recipeRepository.observeUserRecipes(userId).first()
+                recipes.forEach { recipeRepository.deleteRecipe(it.id) }
+
+                // 4. Self-leave the cookbooks where we're a member but not
+                //    the owner — owners stay intact.
+                memberOnly.forEach { cookbookRepository.removeMember(it.id, userId) }
+
+                // 5. Invites we created — revoke so leaked codes can't keep
+                //    adding members to cookbooks we no longer touch.
+                val invites = inviteRepository.observeUserCreatedInvites(userId).first()
+                invites.forEach { inviteRepository.revokeInvite(it.code) }
+
+                // 6. Point of no return: users/{uid} doc + Firebase Auth.
+                authRepository.deleteCurrentUser()
+
+                _deleteAccountSuccess.value = true
+            } catch (e: Exception) {
+                _deleteAccountError.value = friendlyError(e.message)
+            } finally {
+                _isDeletingAccount.value = false
+            }
+        }
+    }
+
+    fun clearDeleteAccountError() {
+        _deleteAccountError.value = null
     }
 
     /**

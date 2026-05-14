@@ -206,7 +206,17 @@ fun AppNavigation(
             val user = currentUser
             if (user != null) {
                 SettingsScreen(
-                    navController = navController
+                    userId = user.id,
+                    navController = navController,
+                    onAccountDeleted = {
+                        // Firebase's authStateChanged will emit null shortly,
+                        // but we route to Login immediately so the user can't
+                        // back-navigate into the half-gone session — and clear
+                        // the entire backstack so there's nothing to land on.
+                        navController.navigate(Route.Login) {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    }
                 )
             }
         }

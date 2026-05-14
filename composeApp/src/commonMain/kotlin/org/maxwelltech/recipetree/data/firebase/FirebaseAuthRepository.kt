@@ -104,18 +104,40 @@ class FirebaseAuthRepository(
         _currentUser.update { it?.copy(displayName = newName) }
     }
 
-    override suspend fun changePassword(currentPassword: String, newPassword: String) {
+    override suspend fun reauthenticate(currentPassword: String) {
         val firebaseUser = auth.currentUser
-            ?: throw IllegalStateException("Must be signed in to change password")
+            ?: throw IllegalStateException("Must be signed in to re-authenticate")
         val email = firebaseUser.email
             ?: throw IllegalStateException("Current account has no email on file")
-        // Firebase requires recent auth to change a password, so re-auth with the
-        // current credentials first. If the current password is wrong this step
-        // throws and we never call updatePassword — the user's actual password
-        // stays untouched.
         val credential = EmailAuthProvider.credential(email = email, password = currentPassword)
         firebaseUser.reauthenticate(credential)
+    }
+
+    override suspend fun changePassword(currentPassword: String, newPassword: String) {
+        // Re-auth first — Firebase requires it for updatePassword and if the
+        // current password is wrong this throws before we touch the password.
+        reauthenticate(currentPassword)
+        val firebaseUser = auth.currentUser
+            ?: throw IllegalStateException("Must be signed in to change password")
         firebaseUser.updatePassword(newPassword)
+    }
+
+    override suspend fun deleteCurrentUser() {
+        val firebaseUser = auth.currentUser
+            ?: throw IllegalStateException("Must be signed in to delete account")
+        // Best-effort clean of the Firestore profile doc first — once the Auth
+        // user is gone, the rules' isSelf() check on users/{uid} can no longer
+        // succeed and the doc would be orphaned. Wrapped in a try so a missing
+        // profile doc (already cleaned up by a prior retry) doesn't block the
+        // Auth delete.
+        try {
+            usersCollection.document(firebaseUser.uid).delete()
+        } catch (_: Exception) {
+            // Either the doc never existed (edge case) or rules rejected it.
+            // We'll still attempt the Auth delete below; an admin tool can
+            // sweep stragglers later.
+        }
+        firebaseUser.delete()
     }
 
     override suspend fun sendPasswordResetEmail(email: String) {

@@ -74,6 +74,13 @@ class FirebaseInviteRepository(
             .map { snapshot -> snapshot.documents.map { it.data<Invite>() } }
     }
 
+    override fun observeUserCreatedInvites(userId: String): Flow<List<Invite>> {
+        return invitesCollection
+            .where { "createdBy" equalTo userId }
+            .snapshots
+            .map { snapshot -> snapshot.documents.map { it.data<Invite>() } }
+    }
+
     override suspend fun acceptInvite(code: String, userId: String): String {
         val normalized = normalizeCode(code)
         if (normalized.isEmpty()) throw IllegalArgumentException("Empty invite code")

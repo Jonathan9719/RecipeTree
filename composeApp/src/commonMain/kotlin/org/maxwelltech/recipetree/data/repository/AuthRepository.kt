@@ -23,6 +23,13 @@ interface AuthRepository {
     suspend fun updateDisplayName(newName: String)
 
     /**
+     * Re-authenticate the current user with their existing password. Firebase
+     * requires this before any "recent auth" operation (changePassword,
+     * delete, email update). Throws if signed out or the password is wrong.
+     */
+    suspend fun reauthenticate(currentPassword: String)
+
+    /**
      * Change the current user's password. Re-authenticates with [currentPassword]
      * first because Firebase requires recent auth for password updates, then
      * calls updatePassword([newPassword]).
@@ -31,6 +38,17 @@ interface AuthRepository {
      * new password fails Firebase's minimum length rule (6 chars).
      */
     suspend fun changePassword(currentPassword: String, newPassword: String)
+
+    /**
+     * Delete the current user's profile doc and Firebase Auth account. Assumes
+     * the caller has already called [reauthenticate]; if recent auth has
+     * lapsed, Firebase rejects the underlying delete().
+     *
+     * This is the "point of no return" — callers should do any data-cascade
+     * work (deleting owned cookbooks, recipes, invites, leaving memberships)
+     * BEFORE calling this so a partial failure leaves the user able to retry.
+     */
+    suspend fun deleteCurrentUser()
 
     suspend fun sendPasswordResetEmail(email: String)
 
