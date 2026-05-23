@@ -17,9 +17,13 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -27,7 +31,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -37,11 +43,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import coil3.compose.AsyncImage
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 import org.maxwelltech.recipetree.AppContainer
 import org.maxwelltech.recipetree.Route
+import org.maxwelltech.recipetree.data.model.Comment
 import org.maxwelltech.recipetree.data.model.Recipe
+import org.maxwelltech.recipetree.data.model.User
 import org.maxwelltech.recipetree.ui.components.InteractiveStarRating
 import org.maxwelltech.recipetree.ui.components.StarRating
+import org.maxwelltech.recipetree.ui.components.UserAvatar
 import org.maxwelltech.recipetree.ui.theme.Sage
 import org.maxwelltech.recipetree.ui.theme.SageLight
 import org.maxwelltech.recipetree.viewmodel.RecipeDetailViewModel
@@ -55,7 +66,9 @@ fun RecipeDetailScreen(
     viewModel: RecipeDetailViewModel = remember {
         RecipeDetailViewModel(
             recipeRepository = AppContainer.recipeRepository,
-            ratingRepository = AppContainer.ratingRepository
+            ratingRepository = AppContainer.ratingRepository,
+            commentRepository = AppContainer.commentRepository,
+            userProfileRepository = AppContainer.userProfileRepository
         )
     }
 ) {
@@ -64,9 +77,19 @@ fun RecipeDetailScreen(
     val error by viewModel.error.collectAsState()
     val myRating by viewModel.myRating.collectAsState()
     val isSubmittingRating by viewModel.isSubmittingRating.collectAsState()
+    val comments by viewModel.comments.collectAsState()
+    val commentAuthors by viewModel.commentAuthors.collectAsState()
+    val commentInput by viewModel.commentInput.collectAsState()
+    val isSubmittingComment by viewModel.isSubmittingComment.collectAsState()
+    val commentError by viewModel.commentError.collectAsState()
+
+    // Lives outside the VM because it's pure UI state (dialog open/closed).
+    // The selected Comment carries through the dialog so we know what to delete.
+    var pendingDelete by remember { mutableStateOf<Comment?>(null) }
 
     LaunchedEffect(recipeId, userId) {
         viewModel.loadRecipe(recipeId, userId)
+        viewModel.observeComments(recipeId)
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -102,7 +125,16 @@ fun RecipeDetailScreen(
                         viewModel.deleteRecipe(recipe!!.id) {
                             navController.popBackStack()
                         }
-                    }
+                    },
+                    comments = comments,
+                    commentAuthors = commentAuthors,
+                    commentInput = commentInput,
+                    isSubmittingComment = isSubmittingComment,
+                    commentError = commentError,
+                    onCommentInputChange = viewModel::updateCommentInput,
+                    onPostComment = { viewModel.submitComment(recipe!!.id, userId) },
+                    onRequestDeleteComment = { comment -> pendingDelete = comment },
+                    onDismissCommentError = viewModel::clearCommentError
                 )
             }
             else -> {
@@ -113,7 +145,61 @@ fun RecipeDetailScreen(
                 )
             }
         }
+
+        // Delete-confirm overlay. Sits inside the Box so it renders on top
+        // of any state above; cleared on dismiss or confirm.
+        pendingDelete?.let { target ->
+            DeleteCommentDialog(
+                onConfirm = {
+                    recipe?.let { r ->
+                        viewModel.deleteComment(r.id, target.id)
+                    }
+                    pendingDelete = null
+                },
+                onDismiss = { pendingDelete = null }
+            )
+        }
     }
+}
+
+@Composable
+private fun DeleteCommentDialog(
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "Delete this comment?",
+                style = MaterialTheme.typography.titleMedium
+            )
+        },
+        text = {
+            Text(
+                text = "This can't be undone.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.error
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text(
+                    text = "Delete",
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.labelLarge
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(
+                    text = "Cancel",
+                    style = MaterialTheme.typography.labelLarge
+                )
+            }
+        }
+    )
 }
 
 @Composable
@@ -124,7 +210,16 @@ private fun RecipeDetailContent(
     myRating: Int,
     isSubmittingRating: Boolean,
     onRate: (Int) -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    comments: List<Comment>,
+    commentAuthors: Map<String, User>,
+    commentInput: String,
+    isSubmittingComment: Boolean,
+    commentError: String?,
+    onCommentInputChange: (String) -> Unit,
+    onPostComment: () -> Unit,
+    onRequestDeleteComment: (Comment) -> Unit,
+    onDismissCommentError: () -> Unit
 ) {
     val isOwner = recipe.ownerId == userId
 
@@ -338,6 +433,70 @@ private fun RecipeDetailContent(
             }
         }
 
+        // Comments section — header, input, and the list. Spread across separate
+        // lazy items so individual comment rows can be lazily composed/disposed
+        // alongside the steps above them.
+        item {
+            Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                Spacer(modifier = Modifier.height(24.dp))
+                SectionHeader(title = if (comments.isEmpty()) "Comments" else "Comments (${comments.size})")
+                Spacer(modifier = Modifier.height(12.dp))
+                CommentInput(
+                    value = commentInput,
+                    onValueChange = onCommentInputChange,
+                    isSubmitting = isSubmittingComment,
+                    onPost = onPostComment
+                )
+                if (commentError != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = commentError,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.weight(1f)
+                        )
+                        TextButton(onClick = onDismissCommentError) {
+                            Text(
+                                text = "Dismiss",
+                                style = MaterialTheme.typography.labelMedium
+                            )
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+        }
+
+        if (comments.isEmpty()) {
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "No comments yet. Be the first.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        } else {
+            items(comments, key = { it.id }) { comment ->
+                CommentItem(
+                    comment = comment,
+                    author = commentAuthors[comment.authorId],
+                    canDelete = comment.authorId == userId || recipe.ownerId == userId,
+                    onDelete = { onRequestDeleteComment(comment) }
+                )
+            }
+        }
+
         item { Spacer(modifier = Modifier.height(32.dp)) }
     }
 }
@@ -445,4 +604,136 @@ private fun formatAverageRating(averageRating: Float, ratingCount: Int): String 
     val decimal = tenths % 10
     val label = if (ratingCount == 1) "1 rating" else "$ratingCount ratings"
     return "$whole.$decimal  ($label)"
+}
+
+@Composable
+private fun CommentInput(
+    value: String,
+    onValueChange: (String) -> Unit,
+    isSubmitting: Boolean,
+    onPost: () -> Unit
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            placeholder = {
+                Text(
+                    text = "Add a comment…",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            enabled = !isSubmitting,
+            minLines = 2,
+            maxLines = 6,
+            modifier = Modifier.fillMaxWidth()
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (isSubmitting) {
+                CircularProgressIndicator(
+                    color = Sage,
+                    strokeWidth = 2.dp,
+                    modifier = Modifier
+                        .size(16.dp)
+                        .padding(end = 4.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+            }
+            Button(
+                onClick = onPost,
+                enabled = value.isNotBlank() && !isSubmitting,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Sage,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                )
+            ) {
+                Text(
+                    text = "Post",
+                    style = MaterialTheme.typography.labelLarge
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CommentItem(
+    comment: Comment,
+    author: User?,
+    canDelete: Boolean,
+    onDelete: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        UserAvatar(
+            displayName = author?.displayName.orEmpty(),
+            email = author?.email.orEmpty(),
+            avatarUrl = author?.avatarUrl,
+            size = 32.dp,
+            textStyle = MaterialTheme.typography.labelMedium
+        )
+        Spacer(modifier = Modifier.width(10.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = author?.displayName?.ifBlank { "Unknown" } ?: "Unknown",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = relativeTime(comment.createdAt),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = comment.text,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onBackground,
+                lineHeight = 20.sp
+            )
+        }
+        if (canDelete) {
+            TextButton(onClick = onDelete) {
+                Text(
+                    text = "Delete",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalTime::class)
+private fun relativeTime(createdAt: Long?): String {
+    if (createdAt == null) return ""
+    val now = Clock.System.now().toEpochMilliseconds()
+    val diffMs = now - createdAt
+    if (diffMs < 0) return "just now"
+    val sec = diffMs / 1000
+    val min = sec / 60
+    val hour = min / 60
+    val day = hour / 24
+    return when {
+        sec < 60 -> "just now"
+        min < 60 -> "${min}m ago"
+        hour < 24 -> "${hour}h ago"
+        day < 7 -> "${day}d ago"
+        day < 30 -> "${day / 7}w ago"
+        day < 365 -> "${day / 30}mo ago"
+        else -> "${day / 365}y ago"
+    }
 }
