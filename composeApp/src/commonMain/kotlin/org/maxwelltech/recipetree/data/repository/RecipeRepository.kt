@@ -9,4 +9,11 @@ interface RecipeRepository {
     suspend fun deleteRecipe(id: String)
     fun observeUserRecipes(userId: String): Flow<List<Recipe>>
     fun observeCookbookRecipes(cookbookId: String): Flow<List<Recipe>>
+
+    /**
+     * Mint a fresh recipe id without writing anything. Used by the new-recipe
+     * edit flow so a photo can be uploaded to recipes/{id}/... before the
+     * recipe doc itself is saved — saveRecipe() honors a pre-set id.
+     */
+    fun newRecipeId(): String
 }

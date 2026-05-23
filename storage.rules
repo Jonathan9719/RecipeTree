@@ -1,0 +1,51 @@
+rules_version = '2';
+
+// ============================================================================
+// Recipe Tree — Firebase Storage security rules
+// ============================================================================
+// NOT YET DEPLOYED. Storage rules live in a SEPARATE tab from Firestore rules:
+//   console → Build → Storage → Rules
+// Or via CLI: `firebase deploy --only storage` (needs `firebase init storage`
+// to have been run; otherwise paste the file contents into the web console).
+//
+// What these rules protect against:
+//   1. Anonymous (signed-out) reads/writes — no one is uploading to our
+//      bucket without an authenticated session.
+//   2. Oversized uploads — caps any object at 8 MB to bound abuse. Our
+//      client compresses to ~300-500 KB JPEG so this is a generous ceiling.
+//   3. Non-image content-types under recipes/** — uploads must be image/*.
+//
+// Known gaps (parallel to firestore.rules):
+//   - We don't cross-check that the recipeId in the path corresponds to a
+//     recipe the uploader actually owns. Storage rules can't easily query
+//     Firestore. A bored signed-in user could write to any recipes/{id}/
+//     prefix; the worst case is a wasted Storage object that nothing
+//     references. Cloud Function on upload finalize is the proper fix.
+//   - No orphan sweep on recipe delete. RecipeRepository.deleteRecipe
+//     drops the doc; the recipe's Storage objects stay until manually
+//     pruned. Cents/year at family scale.
+// ============================================================================
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // recipes/{recipeId}/{photoName}
+    match /recipes/{recipeId}/{photoName} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn()
+        && request.resource.size < 8 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+
+    // Default deny everything else. Nothing currently writes outside
+    // recipes/**; if a future feature does, it gets its own match block
+    // rather than a broad allow.
+    match /{path=**} {
+      allow read, write: if false;
+    }
+  }
+}

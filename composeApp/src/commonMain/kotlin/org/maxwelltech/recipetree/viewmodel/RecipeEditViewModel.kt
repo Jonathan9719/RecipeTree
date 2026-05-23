@@ -11,11 +11,13 @@ import org.maxwelltech.recipetree.data.model.Cookbook
 import org.maxwelltech.recipetree.data.model.Ingredient
 import org.maxwelltech.recipetree.data.model.Recipe
 import org.maxwelltech.recipetree.data.repository.CookbookRepository
+import org.maxwelltech.recipetree.data.repository.PhotoStorageRepository
 import org.maxwelltech.recipetree.data.repository.RecipeRepository
 
 class RecipeEditViewModel(
     private val recipeRepository: RecipeRepository,
-    private val cookbookRepository: CookbookRepository
+    private val cookbookRepository: CookbookRepository,
+    private val photoStorageRepository: PhotoStorageRepository
 ) : ViewModel() {
 
     private val _recipe = MutableStateFlow(Recipe())
@@ -38,6 +40,12 @@ class RecipeEditViewModel(
 
     private val _isDeleting = MutableStateFlow(false)
     val isDeleting: StateFlow<Boolean> = _isDeleting.asStateFlow()
+
+    private val _isUploadingPhoto = MutableStateFlow(false)
+    val isUploadingPhoto: StateFlow<Boolean> = _isUploadingPhoto.asStateFlow()
+
+    private val _photoError = MutableStateFlow<String?>(null)
+    val photoError: StateFlow<String?> = _photoError.asStateFlow()
 
     // Baseline for diffing cookbook membership on save.
     private var initialCookbookIds: Set<String> = emptySet()
@@ -104,6 +112,53 @@ class RecipeEditViewModel(
         } else {
             current + cookbookId
         }
+    }
+
+    /**
+     * Upload [bytes] to recipes/{recipeId}/{uuid}.jpg and append the resulting
+     * URL to the recipe's photoUrls (replacing the first slot since the v1 UI
+     * is single-hero). Mints a fresh recipe id lazily if this is a brand-new
+     * recipe — saveRecipe() will honor that id when the doc is written.
+     *
+     * Caller (the screen) is expected to disable the picker while
+     * isUploadingPhoto is true so a second pick can't race against an
+     * in-flight upload and overwrite each other's _recipe writes.
+     */
+    fun uploadPhoto(bytes: ByteArray) {
+        val current = _recipe.value
+        val recipeId = current.id.ifEmpty { recipeRepository.newRecipeId() }
+
+        _isUploadingPhoto.value = true
+        _photoError.value = null
+        viewModelScope.launch {
+            try {
+                val url = photoStorageRepository.uploadRecipePhoto(recipeId, bytes)
+                _recipe.value = _recipe.value.copy(
+                    id = recipeId,
+                    photoUrls = listOf(url)
+                )
+            } catch (e: Exception) {
+                _photoError.value = e.message ?: "Failed to upload photo"
+            } finally {
+                _isUploadingPhoto.value = false
+            }
+        }
+    }
+
+    /**
+     * Clear the photo locally. The Storage object stays — cleaning it up on
+     * Save would be safer in theory (avoid orphans if the user picks again
+     * after removing), but at family scale the orphan cost is cents/year and
+     * doing the delete here would break the "cancel = no change" invariant
+     * (deleting now then cancelling save would leave the recipe doc pointing
+     * at a vanished URL → broken image).
+     */
+    fun removePhoto() {
+        _recipe.value = _recipe.value.copy(photoUrls = emptyList())
+    }
+
+    fun clearPhotoError() {
+        _photoError.value = null
     }
 
     fun deleteRecipe(recipeId: String, onSuccess: () -> Unit) {

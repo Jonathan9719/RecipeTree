@@ -1,7 +1,9 @@
 package org.maxwelltech.recipetree.ui.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.lazy.LazyRow
@@ -17,6 +19,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import coil3.compose.AsyncImage
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -54,6 +59,7 @@ import org.maxwelltech.recipetree.AppContainer
 import org.maxwelltech.recipetree.Route
 import org.maxwelltech.recipetree.data.model.Cookbook
 import org.maxwelltech.recipetree.data.model.Ingredient
+import org.maxwelltech.recipetree.platform.rememberPhotoPicker
 import org.maxwelltech.recipetree.ui.theme.Sage
 import org.maxwelltech.recipetree.ui.theme.SageLight
 import org.maxwelltech.recipetree.viewmodel.RecipeEditViewModel
@@ -67,7 +73,8 @@ fun RecipeEditScreen(
     viewModel: RecipeEditViewModel = remember {
         RecipeEditViewModel(
             recipeRepository = AppContainer.recipeRepository,
-            cookbookRepository = AppContainer.cookbookRepository
+            cookbookRepository = AppContainer.cookbookRepository,
+            photoStorageRepository = AppContainer.photoStorageRepository
         )
     }
 ) {
@@ -78,6 +85,10 @@ fun RecipeEditScreen(
     val isDeleting by viewModel.isDeleting.collectAsState()
     val error by viewModel.error.collectAsState()
     val saveSuccess by viewModel.saveSuccess.collectAsState()
+    val isUploadingPhoto by viewModel.isUploadingPhoto.collectAsState()
+    val photoError by viewModel.photoError.collectAsState()
+
+    val photoPicker = rememberPhotoPicker { bytes -> viewModel.uploadPhoto(bytes) }
 
     var showDeleteDialog by remember { mutableStateOf(false) }
 
@@ -185,6 +196,38 @@ fun RecipeEditScreen(
                     textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth()
                 )
+            }
+
+            // Photo section — single hero tile. Tap to add (or replace),
+            // small "Remove" pill in the corner when a photo is set, spinner
+            // overlay while an upload is in flight.
+            SectionCard(title = "Photo") {
+                PhotoTile(
+                    photoUrl = recipe.photoUrls.firstOrNull(),
+                    isUploading = isUploadingPhoto,
+                    onTap = { photoPicker.launch() },
+                    onRemove = { viewModel.removePhoto() }
+                )
+                if (photoError != null) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = photoError ?: "",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.weight(1f)
+                        )
+                        TextButton(onClick = { viewModel.clearPhotoError() }) {
+                            Text(
+                                text = "Dismiss",
+                                style = MaterialTheme.typography.labelMedium
+                            )
+                        }
+                    }
+                }
             }
 
             // Basic Info section
@@ -570,6 +613,83 @@ private fun CookbookChips(
                             else MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PhotoTile(
+    photoUrl: String?,
+    isUploading: Boolean,
+    onTap: () -> Unit,
+    onRemove: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(160.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.primaryContainer)
+            // Tap to add OR tap to replace. Disabled during upload so a
+            // double-tap can't race two transactions.
+            .clickable(enabled = !isUploading, onClick = onTap)
+    ) {
+        if (photoUrl != null) {
+            AsyncImage(
+                model = photoUrl,
+                contentDescription = "Recipe photo",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+            // Remove pill in the top-right corner. Sits on a translucent
+            // surface so it stays legible against any underlying photo.
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(8.dp)
+            ) {
+                TextButton(
+                    onClick = onRemove,
+                    enabled = !isUploading
+                ) {
+                    Text(
+                        text = "Remove",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+        } else {
+            // Empty state — a plus glyph and a label that doubles as
+            // affordance hint. No icons pack imported in this project so
+            // we use the same emoji/symbol pattern used elsewhere.
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(text = "+", fontSize = 32.sp, color = Sage)
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Add photo",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        // Upload-in-flight overlay. Sits above any state — empty or loaded.
+        if (isUploading) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.55f)),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(color = Sage)
             }
         }
     }

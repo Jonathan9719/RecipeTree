@@ -44,4 +44,11 @@ class FirebaseRecipeRepository(
             .snapshots
             .map { snapshot -> snapshot.documents.map { it.data() } }
     }
+
+    override fun newRecipeId(): String {
+        // Firestore's auto-id generation is client-side — collection.document
+        // (no id arg) returns a reference with a freshly minted id and no
+        // write. saveRecipe(recipe.copy(id = thisId)) later writes the doc.
+        return recipesCollection.document.id
+    }
 }
