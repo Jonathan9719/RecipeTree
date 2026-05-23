@@ -5,12 +5,14 @@ import dev.gitlive.firebase.firestore.firestore
 import dev.gitlive.firebase.auth.auth
 import org.maxwelltech.recipetree.data.firebase.FirebaseCookbookRepository
 import org.maxwelltech.recipetree.data.firebase.FirebaseInviteRepository
+import org.maxwelltech.recipetree.data.firebase.FirebaseRatingRepository
 import org.maxwelltech.recipetree.data.firebase.FirebaseRecipeRepository
 import org.maxwelltech.recipetree.data.firebase.FirebaseAuthRepository
 import org.maxwelltech.recipetree.data.firebase.FirebaseUserProfileRepository
 import org.maxwelltech.recipetree.data.repository.AuthRepository
 import org.maxwelltech.recipetree.data.repository.CookbookRepository
 import org.maxwelltech.recipetree.data.repository.InviteRepository
+import org.maxwelltech.recipetree.data.repository.RatingRepository
 import org.maxwelltech.recipetree.data.repository.RecipeRepository
 import org.maxwelltech.recipetree.data.repository.UserProfileRepository
 
@@ -32,6 +34,10 @@ object AppContainer {
 
     val inviteRepository: InviteRepository by lazy {
         FirebaseInviteRepository(firestore)
+    }
+
+    val ratingRepository: RatingRepository by lazy {
+        FirebaseRatingRepository(firestore)
     }
 
     val userProfileRepository: UserProfileRepository by lazy {

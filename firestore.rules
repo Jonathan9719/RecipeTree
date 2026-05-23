@@ -24,6 +24,12 @@ rules_version = '2';
 //     non-members (the observeUserCookbooks query is memberIds-scoped), so
 //     this is a low-probability path rather than an open door.
 //   - Finer-grained recipe read rules (currently open to all signed-in users).
+//   - Recipe averageRating / ratingCount integrity. The recipe update rule
+//     below lets any signed-in user patch exactly those two fields so the
+//     client-side rating transaction can land. The transaction guarantees the
+//     math, but a malicious client bypassing it can write arbitrary aggregate
+//     values. Server-side recompute (Cloud Function on ratings write) is the
+//     proper fix.
 // ============================================================================
 
 service cloud.firestore {
@@ -62,16 +68,36 @@ service cloud.firestore {
 
     // ---- recipes/{recipeId} ------------------------------------------------
     // Open read in v1 — recipes are referenced from cookbooks which members
-    // can already see. Mutations must come from the recipe's owner. The
+    // can already see. Mutations must come from the recipe's owner with one
+    // exception: any signed-in user may patch averageRating + ratingCount as
+    // part of the FirebaseRatingRepository.submitRating transaction. The
     // cookbookIds array is updated by addRecipeToCookbook batches, which the
-    // Kotlin layer only calls from the owner's device, so this rule is
-    // consistent with current write paths.
+    // Kotlin layer only calls from the owner's device, so leaving owner-only
+    // for that path stays consistent with current write paths.
     match /recipes/{recipeId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn()
         && request.resource.data.ownerId == request.auth.uid;
-      allow update, delete: if isSignedIn()
+      allow update: if isSignedIn() && (
+        // Owner: unrestricted.
+        resource.data.ownerId == request.auth.uid
+        ||
+        // Rating recompute path: only the two aggregate fields may change.
+        // Math integrity is enforced by the client transaction (see header).
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['averageRating', 'ratingCount'])
+      );
+      allow delete: if isSignedIn()
         && resource.data.ownerId == request.auth.uid;
+
+      // ---- recipes/{recipeId}/ratings/{userId} ----------------------------
+      // userId as doc id enforces one rating per user at the DB level — the
+      // rule just pins that doc to its owner. Read open so the detail screen
+      // can fetch the current viewer's existing rating to pre-fill the stars.
+      match /ratings/{userId} {
+        allow read: if isSignedIn();
+        allow create, update, delete: if isSelf(userId);
+      }
     }
 
     // ---- cookbooks/{cookbookId} -------------------------------------------

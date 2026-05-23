@@ -40,6 +40,8 @@ import coil3.compose.AsyncImage
 import org.maxwelltech.recipetree.AppContainer
 import org.maxwelltech.recipetree.Route
 import org.maxwelltech.recipetree.data.model.Recipe
+import org.maxwelltech.recipetree.ui.components.InteractiveStarRating
+import org.maxwelltech.recipetree.ui.components.StarRating
 import org.maxwelltech.recipetree.ui.theme.Sage
 import org.maxwelltech.recipetree.ui.theme.SageLight
 import org.maxwelltech.recipetree.viewmodel.RecipeDetailViewModel
@@ -50,14 +52,21 @@ fun RecipeDetailScreen(
     recipeId: String,
     userId: String,
     navController: NavController,
-    viewModel: RecipeDetailViewModel = remember { RecipeDetailViewModel(AppContainer.recipeRepository) }
+    viewModel: RecipeDetailViewModel = remember {
+        RecipeDetailViewModel(
+            recipeRepository = AppContainer.recipeRepository,
+            ratingRepository = AppContainer.ratingRepository
+        )
+    }
 ) {
     val recipe by viewModel.recipe.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val error by viewModel.error.collectAsState()
+    val myRating by viewModel.myRating.collectAsState()
+    val isSubmittingRating by viewModel.isSubmittingRating.collectAsState()
 
-    LaunchedEffect(recipeId) {
-        viewModel.loadRecipe(recipeId)
+    LaunchedEffect(recipeId, userId) {
+        viewModel.loadRecipe(recipeId, userId)
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -84,6 +93,11 @@ fun RecipeDetailScreen(
                     recipe = recipe!!,
                     userId = userId,
                     navController = navController,
+                    myRating = myRating,
+                    isSubmittingRating = isSubmittingRating,
+                    onRate = { stars ->
+                        viewModel.submitRating(recipe!!.id, userId, stars)
+                    },
                     onDelete = {
                         viewModel.deleteRecipe(recipe!!.id) {
                             navController.popBackStack()
@@ -107,6 +121,9 @@ private fun RecipeDetailContent(
     recipe: Recipe,
     userId: String,
     navController: NavController,
+    myRating: Int,
+    isSubmittingRating: Boolean,
+    onRate: (Int) -> Unit,
     onDelete: () -> Unit
 ) {
     val isOwner = recipe.ownerId == userId
@@ -236,6 +253,17 @@ private fun RecipeDetailContent(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
+                // Ratings section
+                RatingSection(
+                    averageRating = recipe.averageRating,
+                    ratingCount = recipe.ratingCount,
+                    myRating = myRating,
+                    isSubmittingRating = isSubmittingRating,
+                    onRate = onRate
+                )
+
+                Spacer(modifier = Modifier.height(20.dp))
+
                 // Ingredients section
                 if (recipe.ingredients.isNotEmpty()) {
                     SectionHeader(title = "Ingredients")
@@ -343,4 +371,78 @@ private fun SectionHeader(title: String) {
         color = Sage,
         letterSpacing = 0.08.sp
     )
+}
+
+@Composable
+private fun RatingSection(
+    averageRating: Float,
+    ratingCount: Int,
+    myRating: Int,
+    isSubmittingRating: Boolean,
+    onRate: (Int) -> Unit
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        SectionHeader(title = "Rating")
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // "Your rating" row — tap-to-set. Disabled while a submit is in flight
+        // so a double-tap doesn't fire two transactions; the optimistic update
+        // in the VM means the new star count is already visible.
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "Your rating",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.width(96.dp)
+            )
+            InteractiveStarRating(
+                rating = myRating,
+                onRatingChanged = onRate,
+                enabled = !isSubmittingRating
+            )
+        }
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        // Average row — full stars rounded down + the exact decimal as text.
+        // Honest about the underlying float without inventing a half-star glyph.
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "Average",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.width(96.dp)
+            )
+            if (ratingCount == 0) {
+                Text(
+                    text = "No ratings yet",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                StarRating(rating = averageRating)
+                Text(
+                    text = formatAverageRating(averageRating, ratingCount),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+private fun formatAverageRating(averageRating: Float, ratingCount: Int): String {
+    // Manual one-decimal format — kotlinx-datetime / printf-style aren't great
+    // on KMP and "%.1f".format() isn't available in commonMain. round-half-up.
+    val tenths = ((averageRating * 10f) + 0.5f).toInt()
+    val whole = tenths / 10
+    val decimal = tenths % 10
+    val label = if (ratingCount == 1) "1 rating" else "$ratingCount ratings"
+    return "$whole.$decimal  ($label)"
 }
