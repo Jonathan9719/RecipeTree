@@ -2,6 +2,7 @@ package org.maxwelltech.recipetree.data.firebase
 
 import dev.gitlive.firebase.storage.Data
 import dev.gitlive.firebase.storage.FirebaseStorage
+import dev.gitlive.firebase.storage.storageMetadata
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 import org.maxwelltech.recipetree.data.repository.PhotoStorageRepository
@@ -21,7 +22,16 @@ class FirebasePhotoStorageRepository(
     override suspend fun uploadRecipePhoto(recipeId: String, bytes: ByteArray): String {
         val filename = "${Uuid.random()}.jpg"
         val ref = storage.reference.child("recipes/$recipeId/$filename")
-        ref.putData(firebaseStorageDataOf(bytes))
+        // Explicit image/jpeg so the Storage rules' contentType.matches('image/.*')
+        // check passes. Without metadata, putData defaults to
+        // application/octet-stream and the rule denies the upload before any
+        // bytes land — that surfaces in the SDK as "user does not have
+        // permission to access this object", which is the rule denial, not
+        // an auth issue.
+        ref.putData(
+            data = firebaseStorageDataOf(bytes),
+            metadata = storageMetadata { contentType = "image/jpeg" }
+        )
         return ref.getDownloadUrl()
     }
 

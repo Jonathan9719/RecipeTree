@@ -32,6 +32,13 @@ kotlin {
             implementation(libs.compose.uiToolingPreview)
             implementation(libs.androidx.activity.compose)
 
+            // ktor HTTP engine for Coil's network fetcher. Without it,
+            // AsyncImage silently fails on https:// URLs (Firebase Storage
+            // download URLs included).
+            implementation(libs.ktor.client.okhttp)
+        }
+        iosMain.dependencies {
+            implementation(libs.ktor.client.darwin)
         }
         commonMain.dependencies {
             implementation(libs.compose.runtime)
