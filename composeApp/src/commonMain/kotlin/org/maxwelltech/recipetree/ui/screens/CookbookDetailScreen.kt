@@ -59,6 +59,7 @@ import org.maxwelltech.recipetree.data.model.Invite
 import org.maxwelltech.recipetree.data.model.Recipe
 import org.maxwelltech.recipetree.data.model.User
 import org.maxwelltech.recipetree.ui.components.RecipeCard
+import org.maxwelltech.recipetree.ui.components.RecipeSearchControls
 import org.maxwelltech.recipetree.ui.components.UserAvatar
 import org.maxwelltech.recipetree.ui.theme.Sage
 import org.maxwelltech.recipetree.ui.theme.SageLight
@@ -81,6 +82,10 @@ fun CookbookDetailScreen(
 ) {
     val cookbook by viewModel.cookbook.collectAsState()
     val recipes by viewModel.recipes.collectAsState()
+    val displayedRecipes by viewModel.displayedRecipes.collectAsState()
+    val recipeSearchQuery by viewModel.searchQuery.collectAsState()
+    val recipeSelectedTag by viewModel.selectedTag.collectAsState()
+    val recipeAvailableTags by viewModel.availableTags.collectAsState()
     val members by viewModel.members.collectAsState()
     val invites by viewModel.invites.collectAsState()
     val newlyCreatedInvite by viewModel.newlyCreatedInvite.collectAsState()
@@ -148,6 +153,12 @@ fun CookbookDetailScreen(
                     CookbookDetailContent(
                         cookbook = cookbook!!,
                         recipes = recipes,
+                        displayedRecipes = displayedRecipes,
+                        recipeSearchQuery = recipeSearchQuery,
+                        recipeSelectedTag = recipeSelectedTag,
+                        recipeAvailableTags = recipeAvailableTags,
+                        onRecipeSearchChange = viewModel::updateSearchQuery,
+                        onRecipeTagSelected = viewModel::selectTag,
                         members = members,
                         invites = invites,
                         userId = userId,
@@ -190,6 +201,12 @@ fun CookbookDetailScreen(
 private fun CookbookDetailContent(
     cookbook: Cookbook,
     recipes: List<Recipe>,
+    displayedRecipes: List<Recipe>,
+    recipeSearchQuery: String,
+    recipeSelectedTag: String?,
+    recipeAvailableTags: List<String>,
+    onRecipeSearchChange: (String) -> Unit,
+    onRecipeTagSelected: (String?) -> Unit,
     members: List<User>,
     invites: List<Invite>,
     userId: String,
@@ -369,18 +386,50 @@ private fun CookbookDetailContent(
                 }
             }
         } else {
-            items(recipes) { recipe ->
-                Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 5.dp)) {
-                    RecipeCard(
-                        recipe = recipe,
-                        cookbookNames = emptyList(),
-                        authorName = if (recipe.ownerId == userId) "you" else "author",
-                        onClick = {
-                            navController.navigate(
-                                Route.RecipeDetail(recipeId = recipe.id)
-                            )
-                        }
+            // Search controls sit above the recipe list and stay visible even
+            // when the filter clamps results to zero, so a user can clear
+            // without backing out of the cookbook.
+            item {
+                Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                    RecipeSearchControls(
+                        query = recipeSearchQuery,
+                        onQueryChange = onRecipeSearchChange,
+                        availableTags = recipeAvailableTags,
+                        selectedTag = recipeSelectedTag,
+                        onTagSelected = onRecipeTagSelected
                     )
+                }
+            }
+
+            if (displayedRecipes.isEmpty()) {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(32.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "No matches. Try a different word or tag.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            } else {
+                items(displayedRecipes) { recipe ->
+                    Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 5.dp)) {
+                        RecipeCard(
+                            recipe = recipe,
+                            cookbookNames = emptyList(),
+                            authorName = if (recipe.ownerId == userId) "you" else "author",
+                            onClick = {
+                                navController.navigate(
+                                    Route.RecipeDetail(recipeId = recipe.id)
+                                )
+                            }
+                        )
+                    }
                 }
             }
         }

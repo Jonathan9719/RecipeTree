@@ -2,7 +2,11 @@ package org.maxwelltech.recipetree.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -28,6 +32,7 @@ import androidx.navigation.NavController
 import org.maxwelltech.recipetree.AppContainer
 import org.maxwelltech.recipetree.Route
 import org.maxwelltech.recipetree.ui.components.RecipeCard
+import org.maxwelltech.recipetree.ui.components.RecipeSearchControls
 import org.maxwelltech.recipetree.ui.components.UserAvatar
 import org.maxwelltech.recipetree.viewmodel.AuthViewModel
 import org.maxwelltech.recipetree.viewmodel.RecipeListViewModel
@@ -41,6 +46,10 @@ fun RecipeListScreen(
     viewModel: RecipeListViewModel = remember { RecipeListViewModel(AppContainer.recipeRepository) }
 ) {
     val recipes by viewModel.recipes.collectAsState()
+    val displayedRecipes by viewModel.displayedRecipes.collectAsState()
+    val searchQuery by viewModel.searchQuery.collectAsState()
+    val selectedTag by viewModel.selectedTag.collectAsState()
+    val availableTags by viewModel.availableTags.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val error by viewModel.error.collectAsState()
     val currentUser by authViewModel.currentUser.collectAsState()
@@ -145,28 +154,56 @@ fun RecipeListScreen(
             }
 
             else -> {
-                LazyColumn(
+                Column(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(innerPadding)
-                        .padding(horizontal = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                        top = 8.dp,
-                        bottom = 80.dp
-                    )
+                        .padding(horizontal = 16.dp)
                 ) {
-                    items(recipes) { recipe ->
-                        RecipeCard(
-                            recipe = recipe,
-                            cookbookNames = emptyList(), // will resolve from cookbooks later
-                            authorName = "you",          // will resolve from user later
-                            onClick = {
-                                navController.navigate(
-                                    Route.RecipeDetail(recipeId = recipe.id)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    RecipeSearchControls(
+                        query = searchQuery,
+                        onQueryChange = viewModel::updateSearchQuery,
+                        availableTags = availableTags,
+                        selectedTag = selectedTag,
+                        onTagSelected = viewModel::selectTag
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    if (displayedRecipes.isEmpty()) {
+                        // Filtered to zero — leave the controls visible so the
+                        // user can clear without backing out of the screen.
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "No matches. Try a different word or tag.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                                bottom = 80.dp
+                            )
+                        ) {
+                            items(displayedRecipes) { recipe ->
+                                RecipeCard(
+                                    recipe = recipe,
+                                    cookbookNames = emptyList(), // will resolve from cookbooks later
+                                    authorName = "you",          // will resolve from user later
+                                    onClick = {
+                                        navController.navigate(
+                                            Route.RecipeDetail(recipeId = recipe.id)
+                                        )
+                                    }
                                 )
                             }
-                        )
+                        }
                     }
                 }
             }
