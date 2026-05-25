@@ -3,8 +3,10 @@ package org.maxwelltech.recipetree.platform
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.ImageDecoder
 import android.graphics.Matrix
 import android.net.Uri
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -61,38 +63,52 @@ actual fun rememberPhotoPicker(
 }
 
 /**
- * Read the JPEG's EXIF orientation tag, decode the bitmap, rotate it to upright,
- * resize to MAX_EDGE_PX, and encode as JPEG quality 80. Runs on Dispatchers.IO
- * because BitmapFactory.decodeStream can be hundreds of ms for a multi-MB phone
- * photo and we don't want to jank the picker dismissal frame.
+ * Decode the URI to an upright Bitmap, resize to MAX_EDGE_PX, and JPEG-encode.
+ * Runs on Dispatchers.IO because decode can be hundreds of ms for a multi-MB
+ * phone photo.
  *
- * Phone cameras almost always store landscape pixel data plus an EXIF
- * Orientation tag ("rotate 90° CW to display correctly"). BitmapFactory ignores
- * that tag, so without this rotation step every photo taken in portrait would
- * upload sideways.
+ * Orientation handling: ImageDecoder (API 28+) reads EXIF through the
+ * platform image pipeline and bakes the rotation onto the bitmap as part of
+ * decode — far more reliable than our older ExifInterface-on-the-stream path,
+ * which the Android 13+ Photo Picker URI scheme broke for some image
+ * providers. ExifInterface remains the fallback for API 24-27.
  */
 private suspend fun compressImage(context: Context, uri: Uri): ByteArray =
     withContext(Dispatchers.IO) {
-        val orientation = readExifOrientation(context, uri)
-
-        val decoded = context.contentResolver.openInputStream(uri).use { input ->
-            BitmapFactory.decodeStream(input)
-        } ?: error("Could not decode image at $uri")
-
-        val upright = applyExifOrientation(decoded, orientation)
+        val upright = decodeUprightBitmap(context, uri)
         val resized = resizeToMaxEdge(upright, MAX_EDGE_PX)
-        // recycle intermediates only when a new instance was returned —
-        // applyExifOrientation/resizeToMaxEdge can pass the input through
-        // unchanged when no work is needed, and recycling that would crash
-        // the next consumer.
         if (resized !== upright) upright.recycle()
-        if (upright !== decoded) decoded.recycle()
 
         val out = ByteArrayOutputStream()
         resized.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, out)
         resized.recycle()
         out.toByteArray()
     }
+
+private fun decodeUprightBitmap(context: Context, uri: Uri): Bitmap {
+    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+        val source = ImageDecoder.createSource(context.contentResolver, uri)
+        ImageDecoder.decodeBitmap(source) { decoder, _, _ ->
+            // ALLOCATOR_SOFTWARE is required for the downstream
+            // Bitmap.compress(JPEG, ...) call — hardware-allocated bitmaps
+            // can't be re-encoded. ImageDecoder applies EXIF orientation
+            // automatically (TARGET_COLOR_SPACE_DEFAULT covers that path).
+            decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+        }
+    } else {
+        decodeUprightLegacy(context, uri)
+    }
+}
+
+private fun decodeUprightLegacy(context: Context, uri: Uri): Bitmap {
+    val orientation = readExifOrientation(context, uri)
+    val decoded = context.contentResolver.openInputStream(uri).use { input ->
+        BitmapFactory.decodeStream(input)
+    } ?: error("Could not decode image at $uri")
+    val rotated = applyExifOrientation(decoded, orientation)
+    if (rotated !== decoded) decoded.recycle()
+    return rotated
+}
 
 private fun readExifOrientation(context: Context, uri: Uri): Int {
     return context.contentResolver.openInputStream(uri)?.use { input ->

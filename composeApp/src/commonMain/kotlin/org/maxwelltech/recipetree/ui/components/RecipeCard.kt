@@ -7,11 +7,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -52,7 +52,14 @@ fun RecipeCard(
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
-        Row(modifier = Modifier.heightIn(min = 90.dp)) {
+        // Fixed row height — and the photo Box below uses the same fixed
+        // height — so the photo always fills the card exactly. Intrinsic
+        // measurements undercounted because the LazyRow of tags reports 0
+        // intrinsic, leaving the Photo Box shorter than the Column at draw
+        // time. The Column has SpaceBetween + fillMaxHeight inside this 110dp
+        // box; if your recipe content ever needs more vertical room than
+        // this, bump RECIPE_CARD_HEIGHT.
+        Row(modifier = Modifier.height(RECIPE_CARD_HEIGHT)) {
 
             // Photo
             RecipeCardPhoto(
@@ -106,22 +113,16 @@ fun RecipeCard(
 private fun RecipeCardPhoto(photoUrl: String?) {
     Box(
         modifier = Modifier
-            .width(90.dp)
-            .fillMaxHeight()
+            .size(width = 90.dp, height = RECIPE_CARD_HEIGHT)
             .background(MaterialTheme.colorScheme.primaryContainer),
         contentAlignment = Alignment.Center
     ) {
         if (photoUrl != null) {
-            // matchParentSize() pins the AsyncImage to whatever final size the
-            // Box resolves to — sidesteps the intrinsic-measurement quirk that
-            // can leave AsyncImage shorter than its parent Row when the Row's
-            // height is driven by sibling content, which was painting a strip
-            // of primaryContainer background at the bottom of the card.
             AsyncImage(
                 model = photoUrl,
                 contentDescription = "Recipe photo",
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.matchParentSize()
+                modifier = Modifier.fillMaxSize()
             )
         } else {
             // Placeholder leaf icon using text — replace with Icon when you add Icons dependency
@@ -132,6 +133,8 @@ private fun RecipeCardPhoto(photoUrl: String?) {
         }
     }
 }
+
+private val RECIPE_CARD_HEIGHT = 110.dp
 
 @Composable
 private fun CookbookLabel(cookbookNames: List<String>) {
