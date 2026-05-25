@@ -36,6 +36,11 @@ kotlin {
             // AsyncImage silently fails on https:// URLs (Firebase Storage
             // download URLs included).
             implementation(libs.ktor.client.okhttp)
+
+            // EXIF reader for the image picker. BitmapFactory.decodeStream
+            // ignores EXIF orientation; without this we'd upload sideways
+            // photos for any phone camera capture.
+            implementation(libs.androidx.exifinterface)
         }
         iosMain.dependencies {
             implementation(libs.ktor.client.darwin)

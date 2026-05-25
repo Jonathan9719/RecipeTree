@@ -93,6 +93,11 @@ actual fun rememberPhotoPicker(
 /**
  * Resize a UIImage to MAX_EDGE_PX on its long edge and re-encode as JPEG
  * quality 0.8. Returns null if the source has no pixels or jpeg encoding fails.
+ *
+ * The draw-through-UIGraphicsImageRenderer step runs even when no resize is
+ * needed — that step normalizes UIImage.imageOrientation onto the pixel data
+ * (otherwise UIImageJPEGRepresentation would emit a JPEG with the EXIF tag
+ * intact, and any viewer that doesn't respect EXIF would render it sideways).
  */
 @OptIn(ExperimentalForeignApi::class)
 private fun compressImage(image: UIImage): ByteArray? {
@@ -101,17 +106,17 @@ private fun compressImage(image: UIImage): ByteArray? {
     if (srcW <= 0.0 || srcH <= 0.0) return null
 
     val longEdge = if (srcW > srcH) srcW else srcH
-    val target: UIImage = if (longEdge <= MAX_EDGE_PX) {
-        image
+    val newSize = if (longEdge <= MAX_EDGE_PX) {
+        CGSizeMake(srcW, srcH)
     } else {
         val scale = MAX_EDGE_PX / longEdge
-        val newSize = CGSizeMake(srcW * scale, srcH * scale)
-        val newW = newSize.useContents { width }
-        val newH = newSize.useContents { height }
-        val renderer = UIGraphicsImageRenderer(size = newSize)
-        renderer.imageWithActions { _ ->
-            image.drawInRect(CGRectMake(0.0, 0.0, newW, newH))
-        }
+        CGSizeMake(srcW * scale, srcH * scale)
+    }
+    val newW = newSize.useContents { width }
+    val newH = newSize.useContents { height }
+    val renderer = UIGraphicsImageRenderer(size = newSize)
+    val target = renderer.imageWithActions { _ ->
+        image.drawInRect(CGRectMake(0.0, 0.0, newW, newH))
     }
 
     val jpegData: NSData = UIImageJPEGRepresentation(target, JPEG_QUALITY) ?: return null

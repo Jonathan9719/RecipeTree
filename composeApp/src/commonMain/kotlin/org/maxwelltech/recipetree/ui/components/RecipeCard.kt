@@ -112,13 +112,16 @@ private fun RecipeCardPhoto(photoUrl: String?) {
         contentAlignment = Alignment.Center
     ) {
         if (photoUrl != null) {
+            // matchParentSize() pins the AsyncImage to whatever final size the
+            // Box resolves to — sidesteps the intrinsic-measurement quirk that
+            // can leave AsyncImage shorter than its parent Row when the Row's
+            // height is driven by sibling content, which was painting a strip
+            // of primaryContainer background at the bottom of the card.
             AsyncImage(
                 model = photoUrl,
                 contentDescription = "Recipe photo",
                 contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .width(90.dp)
-                    .fillMaxHeight()
+                modifier = Modifier.matchParentSize()
             )
         } else {
             // Placeholder leaf icon using text — replace with Icon when you add Icons dependency
