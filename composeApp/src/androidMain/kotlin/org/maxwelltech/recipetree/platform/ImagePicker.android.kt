@@ -154,5 +154,20 @@ private fun resizeToMaxEdge(bitmap: Bitmap, maxEdge: Int): Bitmap {
     )
 }
 
+actual fun compressImageBytes(bytes: ByteArray): ByteArray {
+    // No EXIF rotation here — the URL-import path downloads images from the
+    // public web where servers serve already-upright pixels for hot-link
+    // use. If we ever hit a source that doesn't, we can add an ExifInterface
+    // read on the byte array.
+    val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+        ?: error("Could not decode image bytes")
+    val resized = resizeToMaxEdge(bitmap, MAX_EDGE_PX)
+    if (resized !== bitmap) bitmap.recycle()
+    val out = ByteArrayOutputStream()
+    resized.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, out)
+    resized.recycle()
+    return out.toByteArray()
+}
+
 private const val MAX_EDGE_PX = 1600
 private const val JPEG_QUALITY = 80

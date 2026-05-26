@@ -1,6 +1,7 @@
 package org.maxwelltech.recipetree.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -38,6 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -348,6 +350,22 @@ private fun RecipeDetailContent(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
+                // Source URL — only for imported recipes. Sits between the
+                // meta pills and the ratings section; tappable to open in
+                // the system browser via the multiplatform LocalUriHandler.
+                if (!recipe.sourceUrl.isNullOrBlank()) {
+                    val uriHandler = LocalUriHandler.current
+                    Text(
+                        text = "Imported from ${domainOf(recipe.sourceUrl)}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = Sage,
+                        modifier = Modifier
+                            .clickable { uriHandler.openUri(recipe.sourceUrl) }
+                            .padding(vertical = 4.dp)
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
+
                 // Ratings section
                 RatingSection(
                     averageRating = recipe.averageRating,
@@ -618,6 +636,17 @@ private fun composeIngredient(i: org.maxwelltech.recipetree.data.model.Ingredien
         if (i.unit.isNotBlank())   { append(i.unit);   append(' ') }
         append(i.name)
     }.trim()
+
+/**
+ * Strip a URL down to its hostname for the "Imported from <domain>"
+ * attribution line. `https://www.allrecipes.com/recipe/...` →
+ * `www.allrecipes.com`. Conservative on edge cases — any URL without a
+ * scheme returns as-is.
+ */
+private fun domainOf(url: String): String {
+    val afterScheme = url.substringAfter("://", missingDelimiterValue = url)
+    return afterScheme.substringBefore('/').ifEmpty { url }
+}
 
 @Composable
 private fun CommentInput(

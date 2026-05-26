@@ -16,6 +16,7 @@ import platform.CoreGraphics.CGFloat
 import platform.CoreGraphics.CGRectMake
 import platform.CoreGraphics.CGSizeMake
 import platform.Foundation.NSData
+import platform.Foundation.create
 import platform.PhotosUI.PHPickerConfiguration
 import platform.PhotosUI.PHPickerFilter
 import platform.PhotosUI.PHPickerResult
@@ -132,6 +133,17 @@ private fun NSData.toByteArray(): ByteArray {
             memcpy(pinned.addressOf(0), this@toByteArray.bytes, this@toByteArray.length)
         }
     }
+}
+
+@OptIn(ExperimentalForeignApi::class, kotlinx.cinterop.BetaInteropApi::class)
+actual fun compressImageBytes(bytes: ByteArray): ByteArray {
+    if (bytes.isEmpty()) error("Could not decode image bytes (empty)")
+    // ByteArray → NSData (NSData.create copies, so the pin is short-lived).
+    val nsData = bytes.usePinned { pinned ->
+        NSData.create(bytes = pinned.addressOf(0), length = bytes.size.toULong())
+    }
+    val image = UIImage.imageWithData(nsData) ?: error("Could not decode image bytes")
+    return compressImage(image) ?: error("Could not re-encode image as JPEG")
 }
 
 private const val MAX_EDGE_PX: CGFloat = 1600.0

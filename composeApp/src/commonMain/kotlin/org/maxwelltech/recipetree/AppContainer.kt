@@ -18,8 +18,10 @@ import org.maxwelltech.recipetree.data.repository.CookbookRepository
 import org.maxwelltech.recipetree.data.repository.InviteRepository
 import org.maxwelltech.recipetree.data.repository.PhotoStorageRepository
 import org.maxwelltech.recipetree.data.repository.RatingRepository
+import org.maxwelltech.recipetree.data.repository.RecipeImportRepository
 import org.maxwelltech.recipetree.data.repository.RecipeRepository
 import org.maxwelltech.recipetree.data.repository.UserProfileRepository
+import org.maxwelltech.recipetree.data.web.KtorRecipeImportRepository
 
 object AppContainer {
     private val firestore by lazy { Firebase.firestore }
@@ -52,6 +54,10 @@ object AppContainer {
 
     val photoStorageRepository: PhotoStorageRepository by lazy {
         FirebasePhotoStorageRepository(storage)
+    }
+
+    val recipeImportRepository: RecipeImportRepository by lazy {
+        KtorRecipeImportRepository()
     }
 
     val userProfileRepository: UserProfileRepository by lazy {

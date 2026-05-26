@@ -24,3 +24,13 @@ expect class PhotoPickerLauncher {
 expect fun rememberPhotoPicker(
     onPhotoPicked: (ByteArray) -> Unit
 ): PhotoPickerLauncher
+
+/**
+ * Decode arbitrary image bytes (anything BitmapFactory / UIImage can read),
+ * resize to ~1600px long edge, and re-encode as JPEG quality 80. Used by the
+ * URL-import flow when we download a recipe's source image and need to push
+ * it through the same compress pipeline as a user-picked photo.
+ *
+ * Throws if the bytes can't be decoded as an image.
+ */
+expect fun compressImageBytes(bytes: ByteArray): ByteArray

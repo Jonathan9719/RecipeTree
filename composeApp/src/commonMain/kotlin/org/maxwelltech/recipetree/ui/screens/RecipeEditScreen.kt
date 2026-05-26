@@ -23,6 +23,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import coil3.compose.AsyncImage
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -74,7 +75,8 @@ fun RecipeEditScreen(
         RecipeEditViewModel(
             recipeRepository = AppContainer.recipeRepository,
             cookbookRepository = AppContainer.cookbookRepository,
-            photoStorageRepository = AppContainer.photoStorageRepository
+            photoStorageRepository = AppContainer.photoStorageRepository,
+            recipeImportRepository = AppContainer.recipeImportRepository
         )
     }
 ) {
@@ -87,10 +89,25 @@ fun RecipeEditScreen(
     val saveSuccess by viewModel.saveSuccess.collectAsState()
     val isUploadingPhoto by viewModel.isUploadingPhoto.collectAsState()
     val photoError by viewModel.photoError.collectAsState()
+    val isImporting by viewModel.isImporting.collectAsState()
+    val importError by viewModel.importError.collectAsState()
+    val imageImportFailed by viewModel.imageImportFailed.collectAsState()
 
     val photoPicker = rememberPhotoPicker { bytes -> viewModel.uploadPhoto(bytes) }
 
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var showImportDialog by remember { mutableStateOf(false) }
+    var importUrl by remember { mutableStateOf("") }
+
+    // Auto-dismiss the import dialog when the VM signals success (isImporting
+    // flips false with no error). Cancellation via button leaves importError
+    // null too but we only close in that path explicitly via onDismiss.
+    LaunchedEffect(isImporting, importError) {
+        if (showImportDialog && !isImporting && importError == null && recipe.title.isNotBlank()) {
+            showImportDialog = false
+            importUrl = ""
+        }
+    }
 
     // Load existing recipe if editing
     LaunchedEffect(recipeId) {
@@ -198,6 +215,30 @@ fun RecipeEditScreen(
                 )
             }
 
+            // Import section — only shown when creating a new recipe. Edit
+            // mode loaded an existing recipe so the import path isn't useful
+            // (it would overwrite the user's data).
+            if (recipeId == null) {
+                SectionCard(title = "Import") {
+                    Text(
+                        text = "Got a recipe link? Paste it and we'll fill in the title, ingredients, and steps.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedButton(
+                        onClick = { showImportDialog = true },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = "Import from web",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = Sage
+                        )
+                    }
+                }
+            }
+
             // Photo section — single hero tile. Tap to add (or replace),
             // small "Remove" pill in the corner when a photo is set, spinner
             // overlay while an upload is in flight.
@@ -221,6 +262,28 @@ fun RecipeEditScreen(
                             modifier = Modifier.weight(1f)
                         )
                         TextButton(onClick = { viewModel.clearPhotoError() }) {
+                            Text(
+                                text = "Dismiss",
+                                style = MaterialTheme.typography.labelMedium
+                            )
+                        }
+                    }
+                }
+                if (imageImportFailed) {
+                    // Non-blocking: the text imported fine; just the image
+                    // re-upload failed. User can add their own via the picker.
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Couldn't import the photo — add your own from the tile above.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.weight(1f)
+                        )
+                        TextButton(onClick = { viewModel.clearImageImportFailed() }) {
                             Text(
                                 text = "Dismiss",
                                 style = MaterialTheme.typography.labelMedium
@@ -547,6 +610,22 @@ fun RecipeEditScreen(
             }
         )
     }
+
+    if (showImportDialog) {
+        ImportRecipeDialog(
+            url = importUrl,
+            onUrlChange = { importUrl = it },
+            isImporting = isImporting,
+            error = importError,
+            onImport = { viewModel.importFromUrl(importUrl) },
+            onDismiss = {
+                showImportDialog = false
+                importUrl = ""
+                viewModel.clearImportError()
+            },
+            onDismissError = { viewModel.clearImportError() }
+        )
+    }
 }
 
 @Composable
@@ -693,4 +772,98 @@ private fun PhotoTile(
             }
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ImportRecipeDialog(
+    url: String,
+    onUrlChange: (String) -> Unit,
+    isImporting: Boolean,
+    error: String?,
+    onImport: () -> Unit,
+    onDismiss: () -> Unit,
+    onDismissError: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "Paste a recipe link",
+                style = MaterialTheme.typography.titleMedium
+            )
+        },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = url,
+                    onValueChange = onUrlChange,
+                    placeholder = {
+                        Text(
+                            text = "https://www.allrecipes.com/...",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    },
+                    leadingIcon = {
+                        Text(text = "🔗", style = MaterialTheme.typography.bodyLarge)
+                    },
+                    singleLine = true,
+                    enabled = !isImporting,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = textFieldColors(),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                if (error != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = error,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.weight(1f)
+                        )
+                        TextButton(onClick = onDismissError) {
+                            Text(
+                                text = "Dismiss",
+                                style = MaterialTheme.typography.labelMedium
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onImport,
+                enabled = url.isNotBlank() && !isImporting,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Sage,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                )
+            ) {
+                if (isImporting) {
+                    CircularProgressIndicator(
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        strokeWidth = 2.dp,
+                        modifier = Modifier.size(16.dp)
+                    )
+                } else {
+                    Text(text = "Import", style = MaterialTheme.typography.labelLarge)
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                enabled = !isImporting
+            ) {
+                Text(text = "Cancel", style = MaterialTheme.typography.labelLarge)
+            }
+        }
+    )
 }
