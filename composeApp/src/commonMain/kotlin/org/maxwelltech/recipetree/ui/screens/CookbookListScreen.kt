@@ -13,7 +13,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -33,8 +32,6 @@ import androidx.navigation.NavController
 import org.maxwelltech.recipetree.AppContainer
 import org.maxwelltech.recipetree.Route
 import org.maxwelltech.recipetree.ui.components.CookbookCard
-import org.maxwelltech.recipetree.ui.components.UserAvatar
-import org.maxwelltech.recipetree.viewmodel.AuthViewModel
 import org.maxwelltech.recipetree.viewmodel.CookbookListViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -42,7 +39,6 @@ import org.maxwelltech.recipetree.viewmodel.CookbookListViewModel
 fun CookbookListScreen(
     userId: String,
     navController: NavController,
-    authViewModel: AuthViewModel,
     viewModel: CookbookListViewModel = remember {
         CookbookListViewModel(AppContainer.cookbookRepository)
     }
@@ -50,7 +46,6 @@ fun CookbookListScreen(
     val cookbooks by viewModel.cookbooks.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val error by viewModel.error.collectAsState()
-    val currentUser by authViewModel.currentUser.collectAsState()
 
     LaunchedEffect(userId) {
         viewModel.observeUserCookbooks(userId)
@@ -65,36 +60,12 @@ fun CookbookListScreen(
                         style = MaterialTheme.typography.headlineMedium
                     )
                 },
-                navigationIcon = {
-                    TextButton(onClick = {
-                        navController.navigate(Route.RecipeList) {
-                            popUpTo(Route.RecipeList) { inclusive = true }
-                        }
-                    }) {
-                        Text(
-                            text = "Recipes",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                },
                 actions = {
                     TextButton(onClick = { navController.navigate(Route.JoinCookbook) }) {
                         Text(
                             text = "Join",
                             style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                    IconButton(
-                        onClick = { navController.navigate(Route.Profile) }
-                    ) {
-                        UserAvatar(
-                            displayName = currentUser?.displayName.orEmpty(),
-                            email = currentUser?.email.orEmpty(),
-                            avatarUrl = currentUser?.avatarUrl,
-                            size = 32.dp,
-                            textStyle = MaterialTheme.typography.labelLarge
                         )
                     }
                 },

@@ -13,11 +13,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -33,8 +31,6 @@ import org.maxwelltech.recipetree.AppContainer
 import org.maxwelltech.recipetree.Route
 import org.maxwelltech.recipetree.ui.components.RecipeCard
 import org.maxwelltech.recipetree.ui.components.RecipeSearchControls
-import org.maxwelltech.recipetree.ui.components.UserAvatar
-import org.maxwelltech.recipetree.viewmodel.AuthViewModel
 import org.maxwelltech.recipetree.viewmodel.RecipeListViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -42,7 +38,6 @@ import org.maxwelltech.recipetree.viewmodel.RecipeListViewModel
 fun RecipeListScreen(
     userId: String,
     navController: NavController,
-    authViewModel: AuthViewModel,
     viewModel: RecipeListViewModel = remember { RecipeListViewModel(AppContainer.recipeRepository) }
 ) {
     val recipes by viewModel.recipes.collectAsState()
@@ -52,7 +47,6 @@ fun RecipeListScreen(
     val availableTags by viewModel.availableTags.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val error by viewModel.error.collectAsState()
-    val currentUser by authViewModel.currentUser.collectAsState()
 
     LaunchedEffect(userId) {
         viewModel.observeUserRecipes(userId)
@@ -66,30 +60,6 @@ fun RecipeListScreen(
                         text = "My Recipes",
                         style = MaterialTheme.typography.headlineMedium
                     )
-                },
-                actions = {
-                    TextButton(onClick = {
-                        navController.navigate(Route.CookbookList) {
-                            popUpTo(Route.RecipeList) { inclusive = false }
-                        }
-                    }) {
-                        Text(
-                            text = "Cookbooks",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                    IconButton(
-                        onClick = { navController.navigate(Route.Profile) }
-                    ) {
-                        UserAvatar(
-                            displayName = currentUser?.displayName.orEmpty(),
-                            email = currentUser?.email.orEmpty(),
-                            avatarUrl = currentUser?.avatarUrl,
-                            size = 32.dp,
-                            textStyle = MaterialTheme.typography.labelLarge
-                        )
-                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background,

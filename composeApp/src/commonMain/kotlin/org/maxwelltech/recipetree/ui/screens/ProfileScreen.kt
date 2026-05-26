@@ -70,15 +70,6 @@ fun ProfileScreen(
                         style = MaterialTheme.typography.headlineMedium
                     )
                 },
-                navigationIcon = {
-                    TextButton(onClick = { navController.popBackStack() }) {
-                        Text(
-                            text = "← Back",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background,
                     titleContentColor = MaterialTheme.colorScheme.onBackground
