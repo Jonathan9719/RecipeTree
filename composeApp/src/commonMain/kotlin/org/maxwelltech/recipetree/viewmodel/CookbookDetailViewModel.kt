@@ -178,12 +178,30 @@ class CookbookDetailViewModel(
         viewModelScope.launch {
             try {
                 inviteRepository.observeCookbookInvites(cookbookId).collect { invites ->
-                    _invites.value = invites.sortedByDescending { it.createdAt ?: 0L }
+                    // Hide dead invites — fully-used / expired / revoked — so
+                    // the owner's list only shows codes someone could actually
+                    // still redeem. We don't delete the docs (the audit trail
+                    // for lastUsedAt / lastUsedBy stays useful for leaked-code
+                    // forensics), just filter at display time. `now` is
+                    // captured per emission so the next Firestore re-emit
+                    // re-evaluates expiry naturally.
+                    val now = Clock.System.now().toEpochMilliseconds()
+                    _invites.value = invites
+                        .filter { isInviteActive(it, now) }
+                        .sortedByDescending { it.createdAt ?: 0L }
                 }
             } catch (e: Exception) {
                 _inviteActionError.value = friendlyMessage(e, "Couldn't load invites.")
             }
         }
+    }
+
+    private fun isInviteActive(invite: Invite, now: Long): Boolean {
+        if (invite.revoked) return false
+        if (invite.usedCount >= invite.maxUses) return false
+        val expiry = invite.expiresAt
+        if (expiry != null && expiry <= now) return false
+        return true
     }
 
     private fun refreshMembersIfChanged(memberIds: List<String>) {
