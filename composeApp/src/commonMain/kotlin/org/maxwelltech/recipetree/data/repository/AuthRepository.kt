@@ -54,4 +54,14 @@ interface AuthRepository {
 
     // Hook for future SSO — implementations will handle Google, Apple etc.
     suspend fun signInWithSsoToken(token: String, provider: String): User
+
+    /**
+     * Flip seenWelcome to true on the current user's profile doc and patch
+     * the in-memory currentUser StateFlow so the welcome redirect clears
+     * immediately. Safe to call optimistically — the StateFlow patch
+     * happens regardless of whether the Firestore write succeeds, so the
+     * user always gets past the welcome screen; a transient failure just
+     * means they'd see it once more next sign-in.
+     */
+    suspend fun markWelcomeSeen()
 }

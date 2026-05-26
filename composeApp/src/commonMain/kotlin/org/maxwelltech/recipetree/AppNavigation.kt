@@ -23,6 +23,7 @@ import org.maxwelltech.recipetree.ui.screens.RecipeDetailScreen
 import org.maxwelltech.recipetree.ui.screens.RecipeEditScreen
 import org.maxwelltech.recipetree.ui.screens.RecipeListScreen
 import org.maxwelltech.recipetree.ui.screens.SignUpScreen
+import org.maxwelltech.recipetree.ui.screens.WelcomeScreen
 import org.maxwelltech.recipetree.viewmodel.AuthViewModel
 
 sealed interface Route {
@@ -62,6 +63,9 @@ sealed interface Route {
 
     @Serializable
     data object Settings : Route
+
+    @Serializable
+    data object Welcome : Route
 }
 
 @Composable
@@ -71,8 +75,16 @@ fun AppNavigation(
 ) {
     val currentUser by authViewModel.currentUser.collectAsState()
 
-    // Determine start destination based on auth state
-    val startDestination = if (currentUser != null) Route.RecipeList else Route.Login
+    // Determine start destination based on auth + welcome state.
+    // currentUser is null until the FirebaseAuthRepository's async init
+    // finishes its Firestore profile fetch, so on a cold start the
+    // startDestination resolves to Login briefly — that flashes for a tick
+    // before the auth-state listener emits the cached user. Acceptable.
+    val startDestination = when {
+        currentUser == null -> Route.Login
+        currentUser?.seenWelcome != true -> Route.Welcome
+        else -> Route.RecipeList
+    }
 
     NavHost(
         navController = navController,
@@ -93,15 +105,30 @@ fun AppNavigation(
                     navController.navigate(Route.Login) {
                         popUpTo(Route.RecipeList) { inclusive = true }
                     }
+                } else if (user.seenWelcome != true) {
+                    // Cached-auth sign-in resolves into RecipeList by the
+                    // startDestination evaluation, but seenWelcome arrives a
+                    // moment later via the Firestore profile fetch. Catch
+                    // the late false here and redirect.
+                    navController.navigate(Route.Welcome) {
+                        popUpTo(Route.RecipeList) { inclusive = true }
+                    }
                 }
             }
-            if (user != null) {
+            if (user != null && user.seenWelcome == true) {
                 RecipeListScreen(
                     userId = user.id,
                     navController = navController,
                     authViewModel = authViewModel
                 )
             }
+        }
+
+        composable<Route.Welcome> {
+            WelcomeScreen(
+                navController = navController,
+                authViewModel = authViewModel
+            )
         }
 
         composable<Route.RecipeDetail> { backStackEntry ->

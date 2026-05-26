@@ -36,13 +36,29 @@ class FirebaseAuthRepository(
         // sign-out, from Firebase) AND profile edits (from updateDisplayName
         // below, which patches _currentUser directly since authStateChanged
         // doesn't re-emit for profile changes).
+        //
+        // We also fetch the user's Firestore profile doc on each auth state
+        // change so fields that live ONLY in Firestore — avatarUrl, createdAt,
+        // seenWelcome — flow through currentUser the same way Firebase Auth
+        // fields do. Costs one Firestore read per auth state change; falls
+        // back gracefully to the Firebase Auth-only fields if the read fails
+        // (network error, missing doc on legacy accounts).
         scope.launch {
             auth.authStateChanged.collect { firebaseUser ->
-                _currentUser.value = firebaseUser?.let {
+                _currentUser.value = firebaseUser?.let { fbUser ->
+                    val profile = runCatching {
+                        val snapshot = usersCollection.document(fbUser.uid).get()
+                        if (snapshot.exists) snapshot.data<User>() else null
+                    }.getOrNull()
                     User(
-                        id = it.uid,
-                        displayName = it.displayName ?: "",
-                        email = it.email ?: "",
+                        id = fbUser.uid,
+                        displayName = profile?.displayName?.takeUnless { it.isBlank() }
+                            ?: (fbUser.displayName ?: ""),
+                        email = profile?.email?.takeUnless { it.isBlank() }
+                            ?: (fbUser.email ?: ""),
+                        avatarUrl = profile?.avatarUrl,
+                        createdAt = profile?.createdAt,
+                        seenWelcome = profile?.seenWelcome
                     )
                 }
             }
@@ -159,5 +175,37 @@ class FirebaseAuthRepository(
         // Placeholder for future Google/Apple SSO
         // Will use auth.signInWithCredential() when implemented
         throw NotImplementedError("SSO not yet implemented — coming soon")
+    }
+
+    override suspend fun markWelcomeSeen() {
+        // Patch the StateFlow FIRST so the welcome redirect clears immediately
+        // even if the Firestore write fails — user doesn't get stuck on the
+        // carousel because of a transient network blip. Same pattern as the
+        // updateDisplayName flow's optimistic StateFlow patch.
+        _currentUser.update { it?.copy(seenWelcome = true) }
+
+        val firebaseUser = auth.currentUser ?: return
+        val userDocRef = usersCollection.document(firebaseUser.uid)
+        try {
+            val snapshot = userDocRef.get()
+            if (snapshot.exists) {
+                userDocRef.update(mapOf("seenWelcome" to true))
+            } else {
+                // Legacy account with no users/{uid} doc — backfill the way
+                // updateDisplayName does. Same auth.currentUser-derived shape.
+                userDocRef.set(
+                    User(
+                        id = firebaseUser.uid,
+                        displayName = firebaseUser.displayName ?: "",
+                        email = firebaseUser.email ?: "",
+                        seenWelcome = true
+                    )
+                )
+            }
+        } catch (_: Exception) {
+            // Swallow — the StateFlow patch above already unblocked the UI.
+            // Worst case: the next sign-in re-shows the welcome carousel,
+            // which is annoying but not broken.
+        }
     }
 }

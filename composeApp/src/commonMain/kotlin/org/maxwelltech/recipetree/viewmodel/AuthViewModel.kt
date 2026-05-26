@@ -99,6 +99,19 @@ class AuthViewModel(
         _authSuccess.value = false
     }
 
+    /**
+     * Mark the welcome carousel as seen. Optimistic — the repo patches the
+     * StateFlow before the Firestore write completes, so the UI navigates
+     * out of Welcome instantly even on a slow network. A failed write means
+     * the carousel might reappear next sign-in, which is annoying but
+     * recoverable; the carousel handles itself just fine when re-shown.
+     */
+    fun markWelcomeSeen() {
+        viewModelScope.launch {
+            authRepository.markWelcomeSeen()
+        }
+    }
+
     // Converts Firebase error messages into family-friendly language
     private fun friendlyError(message: String?): String {
         return when {
