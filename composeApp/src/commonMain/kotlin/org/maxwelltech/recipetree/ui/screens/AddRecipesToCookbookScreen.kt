@@ -41,6 +41,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -167,9 +168,10 @@ fun AddRecipesToCookbookScreen(
                 }
                 recipes.isEmpty() -> {
                     Text(
-                        text = "You don't have any recipes to add yet.",
+                        text = "You haven't created any recipes yet. Go back and tap + on your recipe list first.",
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
                         modifier = Modifier
                             .align(Alignment.Center)
                             .padding(16.dp)

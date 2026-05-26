@@ -381,9 +381,10 @@ private fun CookbookDetailContent(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "No recipes in this cookbook yet.",
+                        text = "No recipes here yet. Tap + Add above to share one from your collection.",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
                     )
                 }
             }

@@ -27,6 +27,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import org.maxwelltech.recipetree.AppContainer
@@ -154,14 +155,15 @@ fun CookbookListScreen(
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
-                            text = "No cookbooks yet. Tap + to create one.",
+                            text = "No cookbooks yet — tap + to start your first one.",
                             style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         TextButton(onClick = { navController.navigate(Route.JoinCookbook) }) {
                             Text(
-                                text = "Got a code? Join an existing one.",
+                                text = "Got an invite code? Join an existing one.",
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = MaterialTheme.colorScheme.primary
                             )
