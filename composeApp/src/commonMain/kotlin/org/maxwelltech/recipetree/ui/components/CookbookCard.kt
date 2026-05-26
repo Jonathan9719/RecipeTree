@@ -7,10 +7,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -27,6 +28,7 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import org.maxwelltech.recipetree.data.model.Cookbook
 import org.maxwelltech.recipetree.data.model.CookbookVisibility
+import org.maxwelltech.recipetree.ui.util.cookbookEmojiFor
 
 @Composable
 fun CookbookCard(
@@ -48,9 +50,15 @@ fun CookbookCard(
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
-        Row(modifier = Modifier.heightIn(min = 90.dp)) {
+        // Fixed row height + matching photo tile height — same pattern as
+        // RecipeCard. fillMaxHeight inside an intrinsic-driven Row was
+        // leaving the photo tile shorter than the actual row.
+        Row(modifier = Modifier.height(COOKBOOK_CARD_HEIGHT)) {
 
-            CookbookCardPhoto(photoUrl = cookbook.coverPhotoUrl)
+            CookbookCardPhoto(
+                photoUrl = cookbook.coverPhotoUrl,
+                cookbookId = cookbook.id
+            )
 
             Column(
                 modifier = Modifier
@@ -90,11 +98,10 @@ fun CookbookCard(
 }
 
 @Composable
-private fun CookbookCardPhoto(photoUrl: String?) {
+private fun CookbookCardPhoto(photoUrl: String?, cookbookId: String) {
     Box(
         modifier = Modifier
-            .width(90.dp)
-            .fillMaxHeight()
+            .size(width = 90.dp, height = COOKBOOK_CARD_HEIGHT)
             .background(MaterialTheme.colorScheme.primaryContainer),
         contentAlignment = Alignment.Center
     ) {
@@ -103,18 +110,21 @@ private fun CookbookCardPhoto(photoUrl: String?) {
                 model = photoUrl,
                 contentDescription = "Cookbook cover",
                 contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .width(90.dp)
-                    .fillMaxHeight()
+                modifier = Modifier.fillMaxSize()
             )
         } else {
+            // Deterministic emoji per cookbook — same id always picks the
+            // same icon, and CookbookDetailScreen's hero uses the same
+            // call so the card and detail always agree.
             Text(
-                text = "📖",
-                fontSize = 24.sp
+                text = cookbookEmojiFor(cookbookId),
+                fontSize = 32.sp
             )
         }
     }
 }
+
+private val COOKBOOK_CARD_HEIGHT = 100.dp
 
 @Composable
 private fun VisibilityPill(visibility: CookbookVisibility) {

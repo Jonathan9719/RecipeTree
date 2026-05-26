@@ -61,6 +61,7 @@ import org.maxwelltech.recipetree.platform.textClipEntry
 import org.maxwelltech.recipetree.ui.components.RecipeCard
 import org.maxwelltech.recipetree.ui.components.RecipeSearchControls
 import org.maxwelltech.recipetree.ui.components.UserAvatar
+import org.maxwelltech.recipetree.ui.util.cookbookEmojiFor
 import org.maxwelltech.recipetree.ui.theme.Sage
 import org.maxwelltech.recipetree.ui.theme.SageLight
 import org.maxwelltech.recipetree.viewmodel.CookbookDetailViewModel
@@ -253,7 +254,7 @@ private fun CookbookDetailContent(
                             .background(MaterialTheme.colorScheme.primaryContainer),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(text = "📖", fontSize = 48.sp)
+                        Text(text = cookbookEmojiFor(cookbook.id), fontSize = 48.sp)
                     }
                 }
 
