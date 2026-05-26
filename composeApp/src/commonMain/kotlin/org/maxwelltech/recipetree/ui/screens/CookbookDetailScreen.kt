@@ -40,8 +40,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -58,6 +57,7 @@ import org.maxwelltech.recipetree.data.model.CookbookVisibility
 import org.maxwelltech.recipetree.data.model.Invite
 import org.maxwelltech.recipetree.data.model.Recipe
 import org.maxwelltech.recipetree.data.model.User
+import org.maxwelltech.recipetree.platform.textClipEntry
 import org.maxwelltech.recipetree.ui.components.RecipeCard
 import org.maxwelltech.recipetree.ui.components.RecipeSearchControls
 import org.maxwelltech.recipetree.ui.components.UserAvatar
@@ -102,14 +102,16 @@ fun CookbookDetailScreen(
         viewModel.observeInvites(cookbookId)
     }
 
-    val clipboard = LocalClipboardManager.current
+    val clipboard = LocalClipboard.current
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val onCopyInviteCode: (String) -> Unit = { displayCode ->
-        clipboard.setText(AnnotatedString(displayCode))
         scope.launch {
-            // Dismiss any in-flight copy toast before showing a fresh one so
-            // rapid double-taps don't queue multiple.
+            // setClipEntry is suspend on the new Clipboard API, so the write
+            // moves into the same coroutine that drives the snackbar. Dismiss
+            // any in-flight copy toast before showing a fresh one so rapid
+            // double-taps don't queue multiple.
+            clipboard.setClipEntry(textClipEntry(displayCode))
             snackbarHostState.currentSnackbarData?.dismiss()
             snackbarHostState.showSnackbar(
                 message = "Copied $displayCode",
