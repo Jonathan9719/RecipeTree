@@ -18,7 +18,14 @@ data class Recipe(
     val averageRating: Float = 0f,
     val ratingCount: Int = 0,
     val createdAt: Long? = null,
-    val updatedAt: Long? = null
+    val updatedAt: Long? = null,
+    /**
+     * URL the recipe was imported from, or null if entered manually. Surfaced on
+     * the detail screen as a tappable "Imported from <domain>" attribution
+     * line. Nullable + defaulted so every existing Firestore doc deserializes
+     * unchanged.
+     */
+    val sourceUrl: String? = null
 )
 
 @Serializable

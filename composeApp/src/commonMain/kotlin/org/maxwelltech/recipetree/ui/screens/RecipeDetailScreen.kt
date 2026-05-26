@@ -378,7 +378,7 @@ private fun RecipeDetailContent(
                             )
                             Spacer(modifier = Modifier.width(10.dp))
                             Text(
-                                text = ingredient.name,
+                                text = composeIngredient(ingredient),
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = MaterialTheme.colorScheme.onBackground
                             )
@@ -605,6 +605,19 @@ private fun formatAverageRating(averageRating: Float, ratingCount: Int): String 
     val label = if (ratingCount == 1) "1 rating" else "$ratingCount ratings"
     return "$whole.$decimal  ($label)"
 }
+
+/**
+ * Render an ingredient as a single display string by composing the three
+ * structured fields. Manual entries (everything in [name], amount/unit empty)
+ * render the same as before this composer existed; imported entries with all
+ * three fields populated render as "1 cup flour".
+ */
+private fun composeIngredient(i: org.maxwelltech.recipetree.data.model.Ingredient): String =
+    buildString {
+        if (i.amount.isNotBlank()) { append(i.amount); append(' ') }
+        if (i.unit.isNotBlank())   { append(i.unit);   append(' ') }
+        append(i.name)
+    }.trim()
 
 @Composable
 private fun CommentInput(
