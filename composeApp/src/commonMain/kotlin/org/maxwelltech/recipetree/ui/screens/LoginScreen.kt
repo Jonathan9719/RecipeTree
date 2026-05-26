@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -38,10 +39,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import org.jetbrains.compose.resources.painterResource
 import org.maxwelltech.recipetree.Route
 import org.maxwelltech.recipetree.ui.theme.Sage
 import org.maxwelltech.recipetree.ui.theme.SageLight
 import org.maxwelltech.recipetree.viewmodel.AuthViewModel
+import recipetree.composeapp.generated.resources.Res
+import recipetree.composeapp.generated.resources.recipe_tree_logo
 
 @Composable
 fun LoginScreen(
@@ -91,21 +95,18 @@ fun LoginScreen(
             verticalArrangement = Arrangement.Top
         ) {
 
-            // Logo
-            Surface(
+            // Logo — the imported Recipe Tree mark. Square PNG with light
+            // off-white background lives in composeResources/drawable; the
+            // CircleShape clip carves it into the same 72dp circle the
+            // emoji used to render in. No background color now — the
+            // image is the whole tile.
+            Image(
+                painter = painterResource(Res.drawable.recipe_tree_logo),
+                contentDescription = "Recipe Tree logo",
                 modifier = Modifier
                     .size(72.dp)
-                    .clip(CircleShape),
-                color = Sage
-            ) {
-                Column(
-                    modifier = Modifier.fillMaxSize(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Text(text = "🌳", fontSize = 32.sp)
-                }
-            }
+                    .clip(CircleShape)
+            )
 
             Spacer(modifier = Modifier.height(16.dp))
 
