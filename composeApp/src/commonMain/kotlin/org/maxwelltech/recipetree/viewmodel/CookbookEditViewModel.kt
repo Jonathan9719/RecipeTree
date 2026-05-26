@@ -9,6 +9,7 @@ import kotlinx.coroutines.launch
 import org.maxwelltech.recipetree.data.model.Cookbook
 import org.maxwelltech.recipetree.data.model.CookbookVisibility
 import org.maxwelltech.recipetree.data.repository.CookbookRepository
+import org.maxwelltech.recipetree.ui.util.friendlyMessage
 
 class CookbookEditViewModel(
     private val cookbookRepository: CookbookRepository
@@ -35,7 +36,7 @@ class CookbookEditViewModel(
             try {
                 _cookbook.value = cookbookRepository.getCookbook(cookbookId)
             } catch (e: Exception) {
-                _error.value = e.message ?: "Failed to load cookbook"
+                _error.value = friendlyMessage(e, "Couldn't load this cookbook.")
             }
         }
     }
@@ -70,7 +71,7 @@ class CookbookEditViewModel(
                 cookbookRepository.saveCookbook(cookbookToSave)
                 _saveSuccess.value = true
             } catch (e: Exception) {
-                _error.value = e.message ?: "Failed to save cookbook"
+                _error.value = friendlyMessage(e, "Couldn't save this cookbook.")
             } finally {
                 _isSaving.value = false
             }
@@ -85,7 +86,7 @@ class CookbookEditViewModel(
                 cookbookRepository.deleteCookbook(cookbookId)
                 onSuccess()
             } catch (e: Exception) {
-                _error.value = e.message ?: "Failed to delete cookbook"
+                _error.value = friendlyMessage(e, "Couldn't delete this cookbook.")
             } finally {
                 _isDeleting.value = false
             }

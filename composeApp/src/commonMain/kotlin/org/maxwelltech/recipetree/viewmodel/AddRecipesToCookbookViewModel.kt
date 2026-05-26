@@ -10,6 +10,7 @@ import kotlinx.coroutines.launch
 import org.maxwelltech.recipetree.data.model.Recipe
 import org.maxwelltech.recipetree.data.repository.CookbookRepository
 import org.maxwelltech.recipetree.data.repository.RecipeRepository
+import org.maxwelltech.recipetree.ui.util.friendlyMessage
 
 class AddRecipesToCookbookViewModel(
     private val cookbookRepository: CookbookRepository,
@@ -52,7 +53,7 @@ class AddRecipesToCookbookViewModel(
                 initialRecipeIds = already
                 _selectedRecipeIds.value = already
             } catch (e: Exception) {
-                _error.value = e.message ?: "Failed to load recipes"
+                _error.value = friendlyMessage(e, "Couldn't load your recipes.")
             } finally {
                 _isLoading.value = false
             }
@@ -91,7 +92,7 @@ class AddRecipesToCookbookViewModel(
                 }
                 _saveSuccess.value = true
             } catch (e: Exception) {
-                _error.value = e.message ?: "Failed to update cookbook"
+                _error.value = friendlyMessage(e, "Couldn't update this cookbook.")
             } finally {
                 _isSaving.value = false
             }

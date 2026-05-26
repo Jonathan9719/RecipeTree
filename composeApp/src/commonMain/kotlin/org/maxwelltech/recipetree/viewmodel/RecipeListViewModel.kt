@@ -15,6 +15,7 @@ import org.maxwelltech.recipetree.data.model.User
 import org.maxwelltech.recipetree.data.repository.RecipeRepository
 import org.maxwelltech.recipetree.ui.util.availableTags
 import org.maxwelltech.recipetree.ui.util.filterRecipes
+import org.maxwelltech.recipetree.ui.util.friendlyMessage
 
 class RecipeListViewModel(
     private val recipeRepository: RecipeRepository
@@ -73,7 +74,7 @@ class RecipeListViewModel(
                     _isLoading.value = false
                 }
             } catch (e: Exception) {
-                _error.value = e.message ?: "Failed to load recipes"
+                _error.value = friendlyMessage(e, "Couldn't load your recipes.")
                 _isLoading.value = false
             }
         }
@@ -89,7 +90,7 @@ class RecipeListViewModel(
                     _isLoading.value = false
                 }
             } catch (e: Exception) {
-                _error.value = e.message ?: "Failed to observe recipes"
+                _error.value = friendlyMessage(e, "Couldn't load the recipes in this cookbook.")
                 _isLoading.value = false
             }
         }

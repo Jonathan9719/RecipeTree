@@ -13,6 +13,7 @@ import org.maxwelltech.recipetree.data.model.Recipe
 import org.maxwelltech.recipetree.data.repository.CookbookRepository
 import org.maxwelltech.recipetree.data.repository.PhotoStorageRepository
 import org.maxwelltech.recipetree.data.repository.RecipeRepository
+import org.maxwelltech.recipetree.ui.util.friendlyMessage
 
 class RecipeEditViewModel(
     private val recipeRepository: RecipeRepository,
@@ -60,7 +61,7 @@ class RecipeEditViewModel(
                 initialCookbookIds = seeded
                 _selectedCookbookIds.value = seeded
             } catch (e: Exception) {
-                _error.value = e.message ?: "Failed to load recipe"
+                _error.value = friendlyMessage(e, "Couldn't load this recipe.")
             }
         }
     }
@@ -72,7 +73,7 @@ class RecipeEditViewModel(
                     .observeUserCookbooks(userId)
                     .first()
             } catch (e: Exception) {
-                _error.value = e.message ?: "Failed to load cookbooks"
+                _error.value = friendlyMessage(e, "Couldn't load your cookbooks.")
             }
         }
     }
@@ -138,7 +139,7 @@ class RecipeEditViewModel(
                     photoUrls = listOf(url)
                 )
             } catch (e: Exception) {
-                _photoError.value = e.message ?: "Failed to upload photo"
+                _photoError.value = friendlyMessage(e, "Couldn't upload that photo.")
             } finally {
                 _isUploadingPhoto.value = false
             }
@@ -169,7 +170,7 @@ class RecipeEditViewModel(
                 recipeRepository.deleteRecipe(recipeId)
                 onSuccess()
             } catch (e: Exception) {
-                _error.value = e.message ?: "Failed to delete recipe"
+                _error.value = friendlyMessage(e, "Couldn't delete this recipe.")
             } finally {
                 _isDeleting.value = false
             }
@@ -209,7 +210,7 @@ class RecipeEditViewModel(
 
                 _saveSuccess.value = true
             } catch (e: Exception) {
-                _error.value = e.message ?: "Failed to save recipe"
+                _error.value = friendlyMessage(e, "Couldn't save this recipe.")
             } finally {
                 _isSaving.value = false
             }

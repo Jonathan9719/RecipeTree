@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.maxwelltech.recipetree.data.model.User
 import org.maxwelltech.recipetree.data.repository.AuthRepository
+import org.maxwelltech.recipetree.ui.util.friendlyMessage
 
 class ProfileViewModel(
     private val authRepository: AuthRepository
@@ -46,7 +47,7 @@ class ProfileViewModel(
             try {
                 authRepository.updateDisplayName(trimmed)
             } catch (e: Exception) {
-                _error.value = e.message ?: "Failed to update name"
+                _error.value = friendlyMessage(e, "Couldn't update your name.")
             } finally {
                 _isSaving.value = false
             }

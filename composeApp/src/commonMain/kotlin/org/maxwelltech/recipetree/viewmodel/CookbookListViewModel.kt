@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.maxwelltech.recipetree.data.model.Cookbook
 import org.maxwelltech.recipetree.data.repository.CookbookRepository
+import org.maxwelltech.recipetree.ui.util.friendlyMessage
 
 class CookbookListViewModel(
     private val cookbookRepository: CookbookRepository
@@ -32,7 +33,7 @@ class CookbookListViewModel(
                     _isLoading.value = false
                 }
             } catch (e: Exception) {
-                _error.value = e.message ?: "Failed to load cookbooks"
+                _error.value = friendlyMessage(e, "Couldn't load your cookbooks.")
                 _isLoading.value = false
             }
         }

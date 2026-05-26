@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.maxwelltech.recipetree.data.firebase.FirebaseInviteRepository
 import org.maxwelltech.recipetree.data.repository.InviteRepository
+import org.maxwelltech.recipetree.ui.util.friendlyMessage
 
 class JoinCookbookViewModel(
     private val inviteRepository: InviteRepository
@@ -49,7 +50,7 @@ class JoinCookbookViewModel(
                 )
                 _joinedCookbookId.value = cookbookId
             } catch (e: Exception) {
-                _error.value = e.message ?: "Failed to join cookbook"
+                _error.value = friendlyMessage(e, "Couldn't join that cookbook.")
             } finally {
                 _isSubmitting.value = false
             }

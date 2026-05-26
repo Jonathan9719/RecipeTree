@@ -13,6 +13,7 @@ import org.maxwelltech.recipetree.data.repository.CommentRepository
 import org.maxwelltech.recipetree.data.repository.RatingRepository
 import org.maxwelltech.recipetree.data.repository.RecipeRepository
 import org.maxwelltech.recipetree.data.repository.UserProfileRepository
+import org.maxwelltech.recipetree.ui.util.friendlyMessage
 
 class RecipeDetailViewModel(
     private val recipeRepository: RecipeRepository,
@@ -79,7 +80,7 @@ class RecipeDetailViewModel(
                 }
             } catch (e: Exception) {
                 println("DEBUG: Error loading recipe ${e.message}")
-                _error.value = e.message ?: "Failed to load recipe"
+                _error.value = friendlyMessage(e, "Couldn't load this recipe.")
             } finally {
                 _isLoading.value = false
             }
@@ -100,7 +101,7 @@ class RecipeDetailViewModel(
                 _recipe.value = recipeRepository.getRecipe(recipeId)
             } catch (e: Exception) {
                 _myRating.value = previous
-                _error.value = e.message ?: "Failed to submit rating"
+                _error.value = friendlyMessage(e, "Couldn't save your rating.")
             } finally {
                 _isSubmittingRating.value = false
             }
@@ -115,7 +116,7 @@ class RecipeDetailViewModel(
                     refreshAuthorsIfChanged(fetched.map { it.authorId })
                 }
             } catch (e: Exception) {
-                _commentError.value = e.message ?: "Failed to load comments"
+                _commentError.value = friendlyMessage(e, "Couldn't load the comments.")
             }
         }
     }
@@ -153,7 +154,7 @@ class RecipeDetailViewModel(
                 _commentInput.value = ""
                 // observeComments flow will re-emit with the new comment included.
             } catch (e: Exception) {
-                _commentError.value = e.message ?: "Failed to post comment"
+                _commentError.value = friendlyMessage(e, "Couldn't post your comment.")
             } finally {
                 _isSubmittingComment.value = false
             }
@@ -167,7 +168,7 @@ class RecipeDetailViewModel(
                 commentRepository.deleteComment(recipeId, commentId)
                 // observeComments flow drops the deleted doc on its own.
             } catch (e: Exception) {
-                _commentError.value = e.message ?: "Failed to delete comment"
+                _commentError.value = friendlyMessage(e, "Couldn't delete that comment.")
             }
         }
     }
@@ -183,7 +184,7 @@ class RecipeDetailViewModel(
                 recipeRepository.deleteRecipe(recipeId)
                 onSuccess()
             } catch (e: Exception) {
-                _error.value = e.message ?: "Failed to delete recipe"
+                _error.value = friendlyMessage(e, "Couldn't delete this recipe.")
             }
         }
     }

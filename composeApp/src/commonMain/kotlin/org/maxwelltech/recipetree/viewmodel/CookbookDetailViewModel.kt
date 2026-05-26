@@ -20,6 +20,7 @@ import org.maxwelltech.recipetree.data.repository.RecipeRepository
 import org.maxwelltech.recipetree.data.repository.UserProfileRepository
 import org.maxwelltech.recipetree.ui.util.availableTags
 import org.maxwelltech.recipetree.ui.util.filterRecipes
+import org.maxwelltech.recipetree.ui.util.friendlyMessage
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
@@ -136,7 +137,7 @@ class CookbookDetailViewModel(
                     }
                 }
             } catch (e: Exception) {
-                _error.value = e.message ?: "Failed to load cookbook"
+                _error.value = friendlyMessage(e, "Couldn't load this cookbook.")
                 _isLoading.value = false
             }
         }
@@ -150,7 +151,7 @@ class CookbookDetailViewModel(
                     refreshRecipeAuthorsIfChanged(recipes.map { it.ownerId })
                 }
             } catch (e: Exception) {
-                _error.value = e.message ?: "Failed to load recipes"
+                _error.value = friendlyMessage(e, "Couldn't load the recipes in this cookbook.")
             }
         }
     }
@@ -180,7 +181,7 @@ class CookbookDetailViewModel(
                     _invites.value = invites.sortedByDescending { it.createdAt ?: 0L }
                 }
             } catch (e: Exception) {
-                _inviteActionError.value = e.message ?: "Failed to load invites"
+                _inviteActionError.value = friendlyMessage(e, "Couldn't load invites.")
             }
         }
     }
@@ -199,7 +200,7 @@ class CookbookDetailViewModel(
                     resolved[id] ?: User(id = id, displayName = "Unknown member")
                 }
             } catch (e: Exception) {
-                _memberActionError.value = e.message ?: "Failed to load members"
+                _memberActionError.value = friendlyMessage(e, "Couldn't load members.")
             }
         }
     }
@@ -213,7 +214,7 @@ class CookbookDetailViewModel(
                 // observeCookbook flow will emit the updated memberIds and trigger
                 // refreshMembersIfChanged — no manual list mutation needed.
             } catch (e: Exception) {
-                _memberActionError.value = e.message ?: "Failed to remove member"
+                _memberActionError.value = friendlyMessage(e, "Couldn't remove that member.")
             } finally {
                 _isProcessingMember.value = false
             }
@@ -228,7 +229,7 @@ class CookbookDetailViewModel(
                 cookbookRepository.removeMember(cookbookId = cookbookId, userId = userId)
                 onSuccess()
             } catch (e: Exception) {
-                _memberActionError.value = e.message ?: "Failed to leave cookbook"
+                _memberActionError.value = friendlyMessage(e, "Couldn't leave that cookbook.")
             } finally {
                 _isProcessingMember.value = false
             }
@@ -253,7 +254,7 @@ class CookbookDetailViewModel(
                 )
                 _newlyCreatedInvite.value = invite
             } catch (e: Exception) {
-                _inviteActionError.value = e.message ?: "Failed to create invite"
+                _inviteActionError.value = friendlyMessage(e, "Couldn't create an invite.")
             } finally {
                 _isProcessingInvite.value = false
             }
@@ -268,7 +269,7 @@ class CookbookDetailViewModel(
                 inviteRepository.revokeInvite(code)
                 // observeInvites flow will re-emit without the revoked doc.
             } catch (e: Exception) {
-                _inviteActionError.value = e.message ?: "Failed to revoke invite"
+                _inviteActionError.value = friendlyMessage(e, "Couldn't revoke that invite.")
             } finally {
                 _isProcessingInvite.value = false
             }
