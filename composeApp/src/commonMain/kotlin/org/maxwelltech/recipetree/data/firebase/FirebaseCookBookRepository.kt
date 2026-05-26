@@ -102,6 +102,14 @@ class FirebaseCookbookRepository(
             .document(userId)
         batch.set(memberRef, MemberDoc(role = role))
 
+        // Note: we deliberately do NOT touch users/{userId}.memberCookbookIds
+        // here. The Firestore rule for users/{userId} write requires
+        // isSelf(userId), but addMember is typically called by a cookbook
+        // owner adding someone else — so the cross-user write would fail.
+        // The new-member's denormalized list is kept in sync by either (a)
+        // acceptInvite's transaction (self-write, allowed) or (b) the
+        // sign-in backfill in FirebaseAuthRepository.
+
         batch.commit()
     }
 
@@ -116,6 +124,17 @@ class FirebaseCookbookRepository(
             .collection("members")
             .document(userId)
         batch.delete(memberRef)
+
+        // Same reasoning as addMember above — removeMember can be called by
+        // the cookbook owner kicking another user (cross-user write would
+        // fail isSelf rule). Drift on the kicked user's memberCookbookIds
+        // is bounded: their next sign-in triggers the backfill in
+        // FirebaseAuthRepository which re-syncs the list against the
+        // canonical cookbooks-where-I'm-a-member query. Worst-case window:
+        // a freshly-kicked user can still pass the recipes read rule for
+        // that cookbook until they next sign in. Acceptable at family
+        // scale; the cookbook itself stops appearing in their observe
+        // immediately because observeUserCookbooks queries by memberIds.
 
         batch.commit()
     }

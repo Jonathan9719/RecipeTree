@@ -17,5 +17,25 @@ data class User(
      * defaulted so every existing User doc deserializes unchanged with
      * no migration.
      */
-    val seenWelcome: Boolean? = null
+    val seenWelcome: Boolean? = null,
+    /**
+     * Denormalized list of cookbook ids the user is currently a member of.
+     * Mirrors the union of `cookbooks/{id}.memberIds contains userId` queries
+     * and exists so the recipes Firestore read rule can do a single
+     * `get(/users/$uid).data.memberCookbookIds.hasAny(recipe.cookbookIds)`
+     * check without iterating — Firestore rules can't loop over arrays.
+     *
+     * Maintained by FirebaseCookbookRepository.addMember / removeMember,
+     * FirebaseInviteRepository.acceptInvite, and a per-sign-in backfill in
+     * FirebaseAuthRepository (idempotent re-sync against the source of
+     * truth — `cookbooks where memberIds array-contains me`).
+     *
+     * Stale entries can linger if a cookbook is deleted without cascade
+     * (consistent with the existing "orphans accepted at family scale"
+     * policy documented in the action plan). The recipes rule degrades
+     * gracefully — a stale cookbookId in this list just means hasAny
+     * might match against deleted cookbooks, granting reads on already-
+     * orphaned recipes that nothing references anyway.
+     */
+    val memberCookbookIds: List<String> = emptyList()
 )

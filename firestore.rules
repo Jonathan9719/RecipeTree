@@ -67,15 +67,31 @@ service cloud.firestore {
     }
 
     // ---- recipes/{recipeId} ------------------------------------------------
-    // Open read in v1 — recipes are referenced from cookbooks which members
-    // can already see. Mutations must come from the recipe's owner with one
-    // exception: any signed-in user may patch averageRating + ratingCount as
-    // part of the FirebaseRatingRepository.submitRating transaction. The
-    // cookbookIds array is updated by addRecipeToCookbook batches, which the
-    // Kotlin layer only calls from the owner's device, so leaving owner-only
-    // for that path stays consistent with current write paths.
+    // Read is restricted to: the recipe owner, OR a user who's a member of
+    // at least one cookbook the recipe is in. The latter check uses the
+    // denormalized users/{uid}.memberCookbookIds list (maintained by the
+    // invite-accept transaction and a per-sign-in backfill in
+    // FirebaseAuthRepository) and a hasAny() intersection against the
+    // recipe's cookbookIds — Firestore rules can't iterate arrays, so the
+    // denormalization is what makes this expressible without Cloud
+    // Functions. Costs +1 Firestore read per query (the get() on the
+    // requester's users doc), cached across the query's documents.
+    //
+    // Mutations must come from the recipe's owner with one exception: any
+    // signed-in user may patch averageRating + ratingCount as part of the
+    // FirebaseRatingRepository.submitRating transaction. The cookbookIds
+    // array is updated by addRecipeToCookbook batches, which the Kotlin
+    // layer only calls from the owner's device, so leaving owner-only for
+    // that path stays consistent with current write paths.
     match /recipes/{recipeId} {
-      allow read: if isSignedIn();
+      allow read: if isSignedIn() && (
+        resource.data.ownerId == request.auth.uid
+        ||
+        resource.data.cookbookIds.hasAny(
+          get(/databases/$(database)/documents/users/$(request.auth.uid))
+            .data.memberCookbookIds
+        )
+      );
       allow create: if isSignedIn()
         && request.resource.data.ownerId == request.auth.uid;
       allow update: if isSignedIn() && (

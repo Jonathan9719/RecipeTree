@@ -11,6 +11,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.maxwelltech.recipetree.data.model.User
@@ -50,19 +51,52 @@ class FirebaseAuthRepository(
                         val snapshot = usersCollection.document(fbUser.uid).get()
                         if (snapshot.exists) snapshot.data<User>() else null
                     }.getOrNull()
+                    // Backfill memberCookbookIds against the canonical
+                    // cookbooks-where-I'm-a-member query. Idempotent: a no-op
+                    // write when in sync, a one-field update when drifted
+                    // (e.g. owner kicked us from a cookbook while we were
+                    // offline, or we joined via a flow that pre-dated this
+                    // denormalization). Skipped silently if the profile read
+                    // failed or the doc doesn't exist yet (signup-in-flight).
+                    val refreshed = if (profile != null) {
+                        runCatching { backfillMemberCookbookIds(fbUser.uid, profile) }.getOrNull()
+                    } else null
+                    val effective = refreshed ?: profile
                     User(
                         id = fbUser.uid,
-                        displayName = profile?.displayName?.takeUnless { it.isBlank() }
+                        displayName = effective?.displayName?.takeUnless { it.isBlank() }
                             ?: (fbUser.displayName ?: ""),
-                        email = profile?.email?.takeUnless { it.isBlank() }
+                        email = effective?.email?.takeUnless { it.isBlank() }
                             ?: (fbUser.email ?: ""),
-                        avatarUrl = profile?.avatarUrl,
-                        createdAt = profile?.createdAt,
-                        seenWelcome = profile?.seenWelcome
+                        avatarUrl = effective?.avatarUrl,
+                        createdAt = effective?.createdAt,
+                        seenWelcome = effective?.seenWelcome,
+                        memberCookbookIds = effective?.memberCookbookIds ?: emptyList()
                     )
                 }
             }
         }
+    }
+
+    /**
+     * Re-sync the user's denormalized memberCookbookIds with the canonical
+     * source of truth: `cookbooks where memberIds array-contains userId`.
+     * Returns the post-sync User (with the corrected list) so the caller
+     * can plumb it into the StateFlow. Writes only when the sets differ.
+     */
+    private suspend fun backfillMemberCookbookIds(userId: String, profile: User): User {
+        val cookbookIds = firestore.collection("cookbooks")
+            .where { "memberIds" contains userId }
+            .snapshots
+            .first()
+            .documents
+            .map { it.id }
+            .toSet()
+        val current = profile.memberCookbookIds.toSet()
+        if (cookbookIds == current) return profile
+        val updated = cookbookIds.toList()
+        usersCollection.document(userId).update(mapOf("memberCookbookIds" to updated))
+        return profile.copy(memberCookbookIds = updated)
     }
 
     override suspend fun signIn(email: String, password: String): User {

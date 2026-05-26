@@ -8,6 +8,7 @@ import kotlin.time.ExperimentalTime
 import kotlinx.serialization.Serializable
 import org.maxwelltech.recipetree.data.model.Cookbook
 import org.maxwelltech.recipetree.data.model.Invite
+import org.maxwelltech.recipetree.data.model.User
 import org.maxwelltech.recipetree.data.repository.InviteRepository
 import kotlin.random.Random
 
@@ -109,6 +110,22 @@ class FirebaseInviteRepository(
             }
             val cookbook = cookbookSnap.data<Cookbook>()
 
+            // Read the joining user's profile so we can compute the
+            // post-accept memberCookbookIds. The user is the actor here
+            // (self-write), so this satisfies the users/{userId} write rule
+            // requiring isSelf(userId). If the doc doesn't exist (legacy
+            // account that never got a users/{uid} doc), we skip the
+            // memberCookbookIds write below — the sign-in backfill in
+            // FirebaseAuthRepository will catch it up.
+            val userRef = firestore.collection("users").document(userId)
+            val userSnap = get(userRef)
+            val userDocExists = userSnap.exists
+            val currentMemberCookbookIds = if (userDocExists) {
+                userSnap.data<User>().memberCookbookIds
+            } else {
+                emptyList()
+            }
+
             // ---- Validation ----
             if (invite.revoked) {
                 throw IllegalStateException("Invite was revoked")
@@ -151,6 +168,15 @@ class FirebaseInviteRepository(
                 .collection("members")
                 .document(userId)
             set(memberRef, InviteMemberDoc(role = invite.role))
+
+            // Denormalize the new membership onto the joining user's doc.
+            // Skip if the doc doesn't exist (legacy account); backfill on
+            // sign-in handles it. Set-merge would be wrong here because the
+            // doc might be missing other fields we don't want to wipe.
+            if (userDocExists) {
+                val updatedMemberCookbookIds = (currentMemberCookbookIds.toSet() + invite.cookbookId).toList()
+                update(userRef, mapOf("memberCookbookIds" to updatedMemberCookbookIds))
+            }
 
             invite.cookbookId
         }
